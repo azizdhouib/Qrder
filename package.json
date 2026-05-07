@@ -1,0 +1,15 @@
+{
+  "name": "qrder",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w apps/api & npm run dev -w apps/web",
+    "dev:api": "npm run dev -w apps/api",
+    "dev:web": "npm run dev -w apps/web",
+    "build": "npm run build -w apps/api && npm run build -w apps/web",
+    "runtime:reset": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/reset-runtime.ps1",
+    "runtime:stable": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/runtime-stable.ps1"
+  }
+}

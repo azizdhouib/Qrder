@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  OWNER
+  MANAGER
+  KITCHEN
+
+  @@map("qr_user_role")
+}
+
+enum OrderStatus {
+  PLACED
+  PREPARING
+  READY
+  SERVED
+  CANCELLED
+
+  @@map("qr_order_status")
+}
+
+model Restaurant {
+  id         String         @id @default(cuid())
+  name       String
+  slug       String         @unique
+  currency   String         @default("EUR")
+  createdAt  DateTime       @default(now())
+  users      User[]
+  tables     Table[]
+  categories MenuCategory[]
+  items      MenuItem[]
+  orders     Order[]
+
+  @@map("qr_restaurants")
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  role         UserRole   @default(OWNER)
+  createdAt    DateTime   @default(now())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("qr_users")
+}
+
+model Table {
+  id           String     @id @default(cuid())
+  name         String
+  qrToken      String
+  isActive     Boolean    @default(true)
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orders       Order[]
+
+  @@unique([restaurantId, qrToken])
+  @@map("qr_tables")
+}
+
+model MenuCategory {
+  id           String     @id @default(cuid())
+  name         String
+  position     Int        @default(0)
+  isActive     Boolean    @default(true)
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  items        MenuItem[]
+
+  @@map("qr_menu_categories")
+}
+
+model MenuItem {
+  id           String     @id @default(cuid())
+  name         String
+  description  String?
+  imageUrl     String?
+  priceCents   Int
+  isActive     Boolean    @default(true)
+  categoryId   String
+  category     MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  options      MenuItemOption[]
+  orderItems   OrderItem[]
+
+  @@map("qr_menu_items")
+}
+
+model MenuItemOption {
+  id             String   @id @default(cuid())
+  name           String
+  priceDeltaCents Int     @default(0)
+  menuItemId     String
+  menuItem       MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@map("qr_menu_item_options")
+}
+
+model Order {
+  id           String      @id @default(cuid())
+  orderNumber  Int
+  status       OrderStatus @default(PLACED)
+  totalCents   Int
+  notes        String?
+  createdAt    DateTime    @default(now())
+  restaurantId String
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tableId      String
+  table        Table       @relation(fields: [tableId], references: [id], onDelete: Restrict)
+  items        OrderItem[]
+
+  @@unique([restaurantId, orderNumber])
+  @@map("qr_orders")
+}
+
+model OrderItem {
+  id             String                @id @default(cuid())
+  quantity       Int
+  unitPriceCents Int
+  lineTotalCents Int
+  nameSnapshot   String
+  orderId        String
+  order          Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId     String
+  menuItem       MenuItem              @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  options        OrderItemOptionChoice[]
+
+  @@map("qr_order_items")
+}
+
+model OrderItemOptionChoice {
+  id               String    @id @default(cuid())
+  nameSnapshot     String
+  priceDeltaCents  Int
+  orderItemId      String
+  orderItem        OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@map("qr_order_item_option_choices")
+}
