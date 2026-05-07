@@ -11,14 +11,22 @@ import { z } from "zod";
 import { authRequired, signAuthToken } from "./auth.js";
 import { db } from "./db.js";
 
+const corsOrigins = (process.env.WEB_ORIGIN ?? "*")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+const corsOption =
+  corsOrigins.length === 1 && corsOrigins[0] === "*"
+    ? { origin: "*" as const }
+    : { origin: corsOrigins, credentials: true };
+
 const app = express();
-app.use(cors({ origin: process.env.WEB_ORIGIN ?? "*" }));
-app.use(express.json());
+app.use(cors(corsOption));
+app.use(express.json({ limit: "8mb" }));
 
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: process.env.WEB_ORIGIN ?? "*" }
-});
+const io = new Server(server, { cors: corsOption });
 
 io.on("connection", (socket) => {
   socket.on("joinRestaurant", (restaurantId: string) => {
