@@ -38,6 +38,15 @@ type PlacedOrderLine = {
   options: { id: string; nameSnapshot: string; priceDeltaCents: number }[];
 };
 
+function optionSetKey(optionIds: string[]): string {
+  if (optionIds.length === 0) return "";
+  return [...optionIds].sort().join("|");
+}
+
+function sameCartConfig(menuItemId: string, optionIds: string[], line: CartLine): boolean {
+  return line.menuItemId === menuItemId && optionSetKey(line.optionIds) === optionSetKey(optionIds);
+}
+
 export default function PublicMenuPage({
   params
 }: {
@@ -141,6 +150,40 @@ export default function PublicMenuPage({
 
   return (
     <main className="client-menu-page container stack">
+      <div className="client-menu-top-bar" role="toolbar" aria-label="Navigation et panier">
+        <button
+          type="button"
+          className="client-menu-bar-btn client-menu-bar-primary"
+          onClick={() => {
+            setSheetTab("nav");
+            setSheetOpen(true);
+          }}
+        >
+          <span className="client-menu-burger-icon" aria-hidden="true">
+            ☰
+          </span>
+          <span>Menu</span>
+        </button>
+        <button
+          type="button"
+          className={`client-menu-bar-btn client-menu-bar-cart ${cartCount > 0 ? "client-menu-bar-cart-active" : ""}`}
+          onClick={() => {
+            setSheetTab("cart");
+            setSheetOpen(true);
+          }}
+        >
+          <span className="client-menu-cart-label">Panier</span>
+          {cartCount > 0 ? (
+            <>
+              <span className="client-menu-cart-badge">{cartCount}</span>
+              <span className="client-menu-cart-total">{(total / 100).toFixed(2)} €</span>
+            </>
+          ) : (
+            <span className="client-menu-cart-empty">Vide</span>
+          )}
+        </button>
+      </div>
+
       <section className="hero client-menu-hero">
         <span className="badge">Commande mobile</span>
         <h1 className="hero-title">{menu.restaurant.name}</h1>
@@ -175,18 +218,28 @@ export default function PublicMenuPage({
                   <button
                     onClick={() => {
                       const firstOption = item.options[0];
+                      const optionIds = firstOption ? [firstOption.id] : [];
+                      const optionNames = firstOption ? [firstOption.name] : [];
                       const unit = item.priceCents + (firstOption?.priceDeltaCents ?? 0);
-                      setCart((prev) => [
-                        ...prev,
-                        {
-                          menuItemId: item.id,
-                          name: item.name,
-                          quantity: 1,
-                          optionIds: firstOption ? [firstOption.id] : [],
-                          optionNames: firstOption ? [firstOption.name] : [],
-                          unitPriceCents: unit
+                      setCart((prev) => {
+                        const idx = prev.findIndex((l) => sameCartConfig(item.id, optionIds, l));
+                        if (idx >= 0) {
+                          return prev.map((l, i) =>
+                            i === idx ? { ...l, quantity: l.quantity + 1 } : l
+                          );
                         }
-                      ]);
+                        return [
+                          ...prev,
+                          {
+                            menuItemId: item.id,
+                            name: item.name,
+                            quantity: 1,
+                            optionIds,
+                            optionNames,
+                            unitPriceCents: unit
+                          }
+                        ];
+                      });
                     }}
                   >
                     Ajouter
@@ -197,40 +250,6 @@ export default function PublicMenuPage({
           </div>
         </section>
       ))}
-
-      <div className="client-menu-bottom-bar" role="toolbar" aria-label="Navigation et panier">
-        <button
-          type="button"
-          className="client-menu-bar-btn client-menu-bar-primary"
-          onClick={() => {
-            setSheetTab("nav");
-            setSheetOpen(true);
-          }}
-        >
-          <span className="client-menu-burger-icon" aria-hidden="true">
-            ☰
-          </span>
-          <span>Menu</span>
-        </button>
-        <button
-          type="button"
-          className={`client-menu-bar-btn client-menu-bar-cart ${cartCount > 0 ? "client-menu-bar-cart-active" : ""}`}
-          onClick={() => {
-            setSheetTab("cart");
-            setSheetOpen(true);
-          }}
-        >
-          <span className="client-menu-cart-label">Panier</span>
-          {cartCount > 0 ? (
-            <>
-              <span className="client-menu-cart-badge">{cartCount}</span>
-              <span className="client-menu-cart-total">{(total / 100).toFixed(2)} €</span>
-            </>
-          ) : (
-            <span className="client-menu-cart-empty">Vide</span>
-          )}
-        </button>
-      </div>
 
       {sheetOpen && (
         <div className="client-menu-sheet-root" role="dialog" aria-modal="true" aria-label="Menu et panier">
@@ -290,7 +309,10 @@ export default function PublicMenuPage({
                   <>
                     <div className="cart-lines client-menu-cart-lines">
                       {cart.map((line, idx) => (
-                        <div key={`${line.menuItemId}-${idx}`} className="cart-line">
+                        <div
+                          key={`${line.menuItemId}-${optionSetKey(line.optionIds)}`}
+                          className="cart-line"
+                        >
                           <div className="cart-line-info">
                             <strong>{line.name}</strong>
                             {line.optionNames.length > 0 && (
