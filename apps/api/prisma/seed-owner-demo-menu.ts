@@ -15,53 +15,270 @@ type DemoItem = {
   options: { name: string; priceDeltaCents: number }[];
 };
 
+const wm = (filename: string) =>
+  `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}?width=1200`;
+
 const CATALOG: Record<string, DemoItem[]> = {
-  "Articles en vedette": [
-    { name: "Brik", description: "Entree chaude tunisienne.", imageUrl: "https://loremflickr.com/1200/800/tunisian,food?lock=301", priceCents: 650, options: [{ name: "Proteine au choix", priceDeltaCents: 0 }] },
-    { name: "Sandwich Tounsi", description: "Sandwich tunisien traditionnel.", imageUrl: "https://loremflickr.com/1200/800/sandwich?lock=302", priceCents: 1100, options: [] },
-    { name: "Ras Mosli", description: "Plat vedette traditionnel.", imageUrl: "https://loremflickr.com/1200/800/middle-eastern,food?lock=303", priceCents: 1750, options: [] },
-    { name: "Assiette Kefteji", description: "Assiette tunisienne kefteji.", imageUrl: "https://loremflickr.com/1200/800/vegetable,stew?lock=304", priceCents: 1300, options: [] },
-    { name: "Grillade Poisson", description: "Poisson grille.", imageUrl: "https://loremflickr.com/1200/800/grilled,fish?lock=305", priceCents: 1990, options: [] },
-    { name: "Chorba Frik", description: "Soupe frik tunisienne.", imageUrl: "https://loremflickr.com/1200/800/soup?lock=306", priceCents: 800, options: [] },
-    { name: "Mloukhia", description: "Plat tunisien mloukhia.", imageUrl: "https://loremflickr.com/1200/800/stew?lock=307", priceCents: 1790, options: [] }
-  ],
   "Entrees Froides": [
-    { name: "Salade Tunisienne", description: "Salade tunisienne fraiche.", imageUrl: "https://loremflickr.com/1200/800/salad?lock=311", priceCents: 950, options: [] },
-    { name: "Salade Mechouia", description: "Salade mechouia.", imageUrl: "https://loremflickr.com/1200/800/roasted,pepper,salad?lock=312", priceCents: 1000, options: [] }
+    {
+      name: "Salade Tunisienne",
+      description: "Tomates, concombres, oignons, thon et oeuf dur, vinaigrette citronnee.",
+      imageUrl: wm("Tunisian Salad.jpg"),
+      priceCents: 950,
+      options: []
+    },
+    {
+      name: "Salade Mechouia",
+      description: "Poivrons et tomates grilles, ail, huile d'olive, thon et oeuf.",
+      imageUrl: wm("Salade Mechouwya, Tunisie, juin 2021.jpg"),
+      priceCents: 1000,
+      options: []
+    },
+    {
+      name: "Omek Horia",
+      description: "Caviar de carottes epicees, harissa, cumin, ail.",
+      imageUrl: wm("سلاطة أمك حورية.jpg"),
+      priceCents: 900,
+      options: []
+    },
+    {
+      name: "Salade El Bey",
+      description: "Salade signature de la maison, fraicheur et generosite.",
+      imageUrl: wm("Préparation salade Tunisienne.JPG"),
+      priceCents: 1050,
+      options: []
+    }
   ],
   "Entrees Chaudes": [
-    { name: "Brik", description: "Proteine au choix.", imageUrl: "https://loremflickr.com/1200/800/pastry?lock=313", priceCents: 650, options: [{ name: "Proteine au choix", priceDeltaCents: 0 }] },
-    { name: "Chorba Frik", description: "Soupe chaude.", imageUrl: "https://loremflickr.com/1200/800/soup?lock=314", priceCents: 800, options: [] },
-    { name: "Tajine Simple", description: "Tajine simple.", imageUrl: "https://loremflickr.com/1200/800/tajine?lock=315", priceCents: 600, options: [] },
-    { name: "Chorba Langue D'oiseau", description: "Soupe langue d'oiseau.", imageUrl: "https://loremflickr.com/1200/800/noodle,soup?lock=316", priceCents: 800, options: [] }
+    {
+      name: "Brik",
+      description: "Feuille croustillante a l'oeuf, thon, persil, harissa.",
+      imageUrl: wm("Brik, Tajin and salad.JPG"),
+      priceCents: 650,
+      options: [
+        { name: "Thon", priceDeltaCents: 0 },
+        { name: "Viande hachee", priceDeltaCents: 100 },
+        { name: "Fromage", priceDeltaCents: 100 }
+      ]
+    },
+    {
+      name: "Chorba Frik",
+      description: "Soupe traditionnelle de ble vert concasse et viande.",
+      imageUrl: wm("CHORBA FRIK TUNISIENNE.jpg"),
+      priceCents: 800,
+      options: []
+    },
+    {
+      name: "Tajine Simple",
+      description: "Tajine tunisien aux oeufs, fromage et legumes.",
+      imageUrl: wm("Tajine tunisien, 2019.jpg"),
+      priceCents: 600,
+      options: []
+    },
+    {
+      name: "Chorba Langue d'Oiseau",
+      description: "Soupe a la langue d'oiseau (lsen el aasfour), tomates et viande.",
+      imageUrl: wm("CHORBA FRIK TUNISIENNE.jpg"),
+      priceCents: 800,
+      options: []
+    }
   ],
   "Sandwichs Tunisiens": [
-    { name: "Sandwich Tounsi", description: "Sandwich tunisien.", imageUrl: "https://loremflickr.com/1200/800/sandwich?lock=317", priceCents: 1100, options: [] },
-    { name: "Sandwich Kefteji", description: "Sandwich kefteji.", imageUrl: "https://loremflickr.com/1200/800/sandwich?lock=318", priceCents: 1100, options: [] },
-    { name: "Sandwich Mixte", description: "Sandwich mixte.", imageUrl: "https://loremflickr.com/1200/800/sandwich?lock=319", priceCents: 1250, options: [] }
+    {
+      name: "Sandwich Tounsi",
+      description: "Le casse-croute tunisien : thon, oeuf, harissa, olives, mechouia.",
+      imageUrl: wm("Brik, Tajin and salad.JPG"),
+      priceCents: 1100,
+      options: []
+    },
+    {
+      name: "Sandwich Kefteji",
+      description: "Sandwich aux legumes frits, oeuf et harissa.",
+      imageUrl: wm("Kefteji 2.jpg"),
+      priceCents: 1100,
+      options: []
+    },
+    {
+      name: "Sandwich Mixte",
+      description: "Generosite tunisienne : thon, viande hachee, oeuf, harissa.",
+      imageUrl: wm("Brik, Tajin and salad.JPG"),
+      priceCents: 1250,
+      options: []
+    }
   ],
   Plats: [
-    { name: "Ras Mosli", description: "Plat principal tunisien.", imageUrl: "https://loremflickr.com/1200/800/main-course?lock=321", priceCents: 1750, options: [] },
-    { name: "Mloukhia", description: "Mloukhia maison.", imageUrl: "https://loremflickr.com/1200/800/stew?lock=322", priceCents: 1790, options: [] },
-    { name: "Couscous", description: "Proteine au choix.", imageUrl: "https://loremflickr.com/1200/800/couscous?lock=323", priceCents: 1600, options: [{ name: "Poulet", priceDeltaCents: 0 }, { name: "Agneau", priceDeltaCents: 0 }, { name: "Merguez", priceDeltaCents: 0 }] },
-    { name: "Spaghettis Fell", description: "Proteine au choix.", imageUrl: "https://loremflickr.com/1200/800/spaghetti?lock=324", priceCents: 1600, options: [{ name: "Poulet", priceDeltaCents: 0 }, { name: "Boeuf", priceDeltaCents: 0 }] },
-    { name: "Riz Djerbien", description: "Riz djerbien.", imageUrl: "https://loremflickr.com/1200/800/rice,dish?lock=325", priceCents: 1650, options: [] }
+    {
+      name: "Ras Mosli",
+      description: "Tete d'agneau braisee, specialite tunisienne emblematique.",
+      imageUrl: wm("Couscous Tunisien au poulet ( Tunisian chiken couscous ).jpg"),
+      priceCents: 1750,
+      options: []
+    },
+    {
+      name: "Couscous",
+      description: "Couscous traditionnel mijote, semoule fine, legumes et bouillon.",
+      imageUrl: wm("Couscous Tunisien au poulet ( Tunisian chiken couscous ).jpg"),
+      priceCents: 1600,
+      options: [
+        { name: "Poulet", priceDeltaCents: 0 },
+        { name: "Agneau", priceDeltaCents: 200 },
+        { name: "Merguez", priceDeltaCents: 100 }
+      ]
+    },
+    {
+      name: "Spaghettis Fell",
+      description: "Pates a la sauce tomate epicee, plat populaire tunisien.",
+      imageUrl: wm("Couscous Tunisien au poulet ( Tunisian chiken couscous ).jpg"),
+      priceCents: 1600,
+      options: [
+        { name: "Poulet", priceDeltaCents: 0 },
+        { name: "Boeuf", priceDeltaCents: 100 }
+      ]
+    },
+    {
+      name: "Riz Djerbien",
+      description: "Riz parfume aux herbes, viande et legumes, specialite de Djerba.",
+      imageUrl: wm("Riz jerbi.JPG"),
+      priceCents: 1650,
+      options: []
+    },
+    {
+      name: "Mloukhia",
+      description: "Ragout de feuilles de corete, viande tendre, plat traditionnel.",
+      imageUrl: wm("Molokheya hi res.JPG"),
+      priceCents: 1790,
+      options: []
+    }
   ],
   "Assiettes Tunisiennes": [
-    { name: "Assiette Tunisienne", description: "Assiette tunisienne.", imageUrl: "https://loremflickr.com/1200/800/platter?lock=326", priceCents: 1300, options: [] },
-    { name: "Assiette Mixte", description: "Assiette mixte.", imageUrl: "https://loremflickr.com/1200/800/platter?lock=327", priceCents: 1690, options: [] },
-    { name: "Assiette Kefteji", description: "Assiette kefteji.", imageUrl: "https://loremflickr.com/1200/800/platter?lock=328", priceCents: 1300, options: [] },
-    { name: "Assiette Ojja", description: "Proteine au choix.", imageUrl: "https://loremflickr.com/1200/800/egg,tomato?lock=329", priceCents: 1200, options: [{ name: "Proteine au choix", priceDeltaCents: 0 }] },
-    { name: "Assiette Escalope", description: "Assiette escalope.", imageUrl: "https://loremflickr.com/1200/800/escalope?lock=330", priceCents: 1400, options: [] }
+    {
+      name: "Assiette Tunisienne",
+      description: "Plateau decouverte de specialites tunisiennes.",
+      imageUrl: wm("Brik, Tajin and salad.JPG"),
+      priceCents: 1300,
+      options: []
+    },
+    {
+      name: "Assiette Mixte",
+      description: "Generosite tunisienne : kefteji, ojja, brik, salade.",
+      imageUrl: wm("Brik, Tajin and salad.JPG"),
+      priceCents: 1690,
+      options: []
+    },
+    {
+      name: "Assiette Kefteji",
+      description: "Legumes frits hache, oeuf brouille, harissa, plat populaire.",
+      imageUrl: wm("Kefteji 2.jpg"),
+      priceCents: 1300,
+      options: []
+    },
+    {
+      name: "Assiette Ojja",
+      description: "Sauce tomate epicee aux oeufs et merguez, harissa.",
+      imageUrl: wm("Ojja merguez, Tunisie, avril 2019.jpg"),
+      priceCents: 1200,
+      options: [
+        { name: "Merguez", priceDeltaCents: 0 },
+        { name: "Crevettes", priceDeltaCents: 300 },
+        { name: "Poulet", priceDeltaCents: 100 }
+      ]
+    }
   ],
   Grillades: [
-    { name: "Grillade Poisson", description: "Grillade poisson.", imageUrl: "https://loremflickr.com/1200/800/grilled,fish?lock=331", priceCents: 1990, options: [] }
+    {
+      name: "Grillade Poisson",
+      description: "Daurade ou bar grille, riz et salade verte.",
+      imageUrl: wm("Daurade grillée, riz et salade verte servie à Lyon, France.jpg"),
+      priceCents: 1990,
+      options: []
+    },
+    {
+      name: "Grillade Mixte",
+      description: "Brochettes d'agneau, merguez, escalope de poulet, frites.",
+      imageUrl: wm("Huit merguez et trois saucisses en début de cuisson au barbecue en mars 2020.jpg"),
+      priceCents: 1900,
+      options: []
+    },
+    {
+      name: "Escalope de Poulet",
+      description: "Escalope grillee, sauce a la creme, riz ou frites.",
+      imageUrl: wm("Riz et Escalope de poulet à la crème.jpg"),
+      priceCents: 1400,
+      options: [
+        { name: "Riz", priceDeltaCents: 0 },
+        { name: "Frites", priceDeltaCents: 0 }
+      ]
+    },
+    {
+      name: "Gambas Royales",
+      description: "Gambas grillees a la plancha, riz parfume.",
+      imageUrl: wm("Gambas grillés à Dole (Jura).JPG"),
+      priceCents: 2200,
+      options: []
+    }
   ],
-  "Menus Enfants": [],
-  Desserts: [],
+  Desserts: [
+    {
+      name: "Assida Zgougou",
+      description: "Creme de pignons de pin d'Alep, decoration aux fruits secs.",
+      imageUrl: wm("Assida Zgougou familiale.jpg"),
+      priceCents: 600,
+      options: []
+    },
+    {
+      name: "Patisseries Orientales",
+      description: "Assortiment de baklawa, makroudh et samsa au miel et amandes.",
+      imageUrl: wm("Baklawas.JPG"),
+      priceCents: 550,
+      options: []
+    },
+    {
+      name: "Bouza",
+      description: "Creme onctueuse aux noix de pin et fleur d'oranger.",
+      imageUrl: wm("Assida Zgougou familiale.jpg"),
+      priceCents: 600,
+      options: []
+    }
+  ],
   Boissons: [
-    { name: "Coca Cola 33cl", description: "Boisson fraiche.", imageUrl: "https://images.unsplash.com/photo-1554866585-cd94860890b7?auto=format&fit=crop&w=1200&q=80", priceCents: 300, options: [] },
-    { name: "Eau minerale 50cl", description: "Plate ou gazeuse.", imageUrl: "https://images.pexels.com/photos/11031194/pexels-photo-11031194.png?cs=srgb&dl=pexels-moises-ribeiro-121009898-11031194.jpg&fm=jpg", priceCents: 250, options: [{ name: "Gazeuse", priceDeltaCents: 0 }] }
+    {
+      name: "Coca-Cola 33cl",
+      description: "Boisson fraiche.",
+      imageUrl: "https://images.unsplash.com/photo-1554866585-cd94860890b7?auto=format&fit=crop&w=1200&q=80",
+      priceCents: 300,
+      options: []
+    },
+    {
+      name: "Eau Minerale 50cl",
+      description: "Plate ou gazeuse.",
+      imageUrl: "https://images.pexels.com/photos/11031194/pexels-photo-11031194.png?auto=compress&cs=tinysrgb&w=1200",
+      priceCents: 250,
+      options: [
+        { name: "Plate", priceDeltaCents: 0 },
+        { name: "Gazeuse", priceDeltaCents: 0 }
+      ]
+    },
+    {
+      name: "The a la Menthe",
+      description: "The vert a la menthe fraiche, sucre.",
+      imageUrl: "https://images.pexels.com/photos/230477/pexels-photo-230477.jpeg?auto=compress&cs=tinysrgb&w=1200",
+      priceCents: 350,
+      options: []
+    },
+    {
+      name: "Cafe Express",
+      description: "Cafe arabica corse.",
+      imageUrl: "https://images.pexels.com/photos/302899/pexels-photo-302899.jpeg?auto=compress&cs=tinysrgb&w=1200",
+      priceCents: 250,
+      options: []
+    },
+    {
+      name: "Jus d'Orange Frais",
+      description: "Presse a la commande.",
+      imageUrl: "https://images.pexels.com/photos/1435735/pexels-photo-1435735.jpeg?auto=compress&cs=tinysrgb&w=1200",
+      priceCents: 400,
+      options: []
+    }
   ]
 };
 
@@ -76,8 +293,8 @@ async function main() {
   if (!user) {
     const restaurant = await db.restaurant.create({
       data: {
-        name: "Demo Bistro",
-        slug: `demo-bistro-${Math.floor(Math.random() * 100000)}`
+        name: "El Bey",
+        slug: `el-bey-${Math.floor(Math.random() * 100000)}`
       }
     });
 
@@ -98,6 +315,16 @@ async function main() {
     });
   }
 
+  await db.restaurant.update({
+    where: { id: user.restaurantId },
+    data: { name: "El Bey" }
+  });
+  user = await db.user.findUnique({
+    where: { id: user.id },
+    include: { restaurant: true }
+  });
+  if (!user) throw new Error("User vanished after restaurant rename");
+
   const restaurantId = user.restaurantId;
   const webOrigin = process.env.WEB_ORIGIN ?? "http://localhost:3000";
 
@@ -114,6 +341,11 @@ async function main() {
   }
 
   await db.menuItem.updateMany({
+    where: { restaurantId },
+    data: { isActive: false }
+  });
+
+  await db.menuCategory.updateMany({
     where: { restaurantId },
     data: { isActive: false }
   });

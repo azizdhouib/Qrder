@@ -120,7 +120,7 @@ export default function AuthPage() {
           )}
         </div>
         {errorMessage && (
-          <p className="muted" style={{ color: "#fca5a5" }}>
+          <p className="muted" style={{ color: "#8E2A23" }}>
             {errorMessage}
           </p>
         )}
