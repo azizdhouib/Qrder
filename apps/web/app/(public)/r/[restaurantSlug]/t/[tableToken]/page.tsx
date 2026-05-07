@@ -51,6 +51,8 @@ export default function PublicMenuPage({
   const [orderNumber, setOrderNumber] = useState<number | null>(null);
   const [placedItems, setPlacedItems] = useState<PlacedOrderLine[]>([]);
   const [placedTotal, setPlacedTotal] = useState(0);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetTab, setSheetTab] = useState<"nav" | "cart">("nav");
 
   useEffect(() => {
     params.then(setResolved);
@@ -75,10 +77,21 @@ export default function PublicMenuPage({
     };
   }, [orderId]);
 
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [sheetOpen]);
+
   const total = useMemo(
     () => cart.reduce((acc, line) => acc + line.unitPriceCents * line.quantity, 0),
     [cart]
   );
+
+  const cartCount = useMemo(() => cart.reduce((acc, l) => acc + l.quantity, 0), [cart]);
 
   if (!menu || !resolved) {
     return (
@@ -91,29 +104,64 @@ export default function PublicMenuPage({
     );
   }
 
+  function scrollToCategory(catId: string) {
+    document.getElementById(`menu-cat-${catId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setSheetOpen(false);
+  }
+
+  async function submitOrder() {
+    if (!resolved) return;
+    const payload = {
+      restaurantSlug: resolved.restaurantSlug,
+      tableToken: resolved.tableToken,
+      items: cart.map((c) => ({
+        menuItemId: c.menuItemId,
+        quantity: c.quantity,
+        optionIds: c.optionIds
+      }))
+    };
+    const order = await apiFetch<{
+      id: string;
+      status: string;
+      orderNumber: number;
+      totalCents: number;
+      items: PlacedOrderLine[];
+    }>("/public/orders", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    setOrderId(order.id);
+    setOrderStatus(order.status);
+    setOrderNumber(order.orderNumber);
+    setPlacedItems(order.items);
+    setPlacedTotal(order.totalCents);
+    setCart([]);
+    setSheetOpen(false);
+  }
+
   return (
-    <main className="container stack">
-      <section className="hero">
+    <main className="client-menu-page container stack">
+      <section className="hero client-menu-hero">
         <span className="badge">Commande mobile</span>
         <h1 className="hero-title">{menu.restaurant.name}</h1>
-        <p className="hero-subtitle">Table {menu.table.name} - scan vers commande en 2 clics</p>
+        <p className="hero-subtitle">Table {menu.table.name}</p>
       </section>
 
       {menu.categories.map((cat) => (
-        <section key={cat.id} className="panel">
+        <section key={cat.id} id={`menu-cat-${cat.id}`} className="panel client-menu-category">
           <div className="row-between">
-            <h3 className="panel-title">{cat.name}</h3>
-            <span className="pill">{cat.items.length} plats</span>
+            <h3 className="panel-title client-menu-cat-title">{cat.name}</h3>
+            <span className="pill">{cat.items.length}</span>
           </div>
-          <div className="menu-grid">
+          <div className="menu-grid client-menu-grid">
             {cat.items.map((item) => (
               <article key={item.id} className="menu-card">
                 <div className="menu-card-media">
                   {item.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.imageUrl} alt={item.name} className="menu-thumb" />
+                    <img src={item.imageUrl} alt={item.name} className="menu-thumb client-menu-thumb" />
                   ) : (
-                    <div className="menu-thumb menu-thumb-placeholder">Photo à venir</div>
+                    <div className="menu-thumb menu-thumb-placeholder client-menu-thumb">Photo à venir</div>
                   )}
                 </div>
                 <div className="menu-card-body">
@@ -121,7 +169,7 @@ export default function PublicMenuPage({
                     <strong>{item.name}</strong>
                     <strong>{(item.priceCents / 100).toFixed(2)} EUR</strong>
                   </div>
-                  <p className="muted">{item.description ?? "Plat maison"}</p>
+                  <p className="muted client-menu-desc">{item.description ?? "Plat maison"}</p>
                 </div>
                 <div className="menu-card-footer">
                   <button
@@ -150,132 +198,191 @@ export default function PublicMenuPage({
         </section>
       ))}
 
-      <section className="cart-sticky">
-        <div className="row-between">
-          <div>
-            <strong>Panier ({cart.reduce((acc, l) => acc + l.quantity, 0)})</strong>
-            <p className="muted" style={{ margin: 0 }}>Total: {(total / 100).toFixed(2)} EUR</p>
-          </div>
-          <div className="row" style={{ gap: 6 }}>
-            {cart.length > 0 && (
-              <button
-                className="btn-secondary"
-                onClick={() => setCart([])}
-                title="Vider le panier"
-              >
-                Vider
+      <div className="client-menu-bottom-bar" role="toolbar" aria-label="Navigation et panier">
+        <button
+          type="button"
+          className="client-menu-bar-btn client-menu-bar-primary"
+          onClick={() => {
+            setSheetTab("nav");
+            setSheetOpen(true);
+          }}
+        >
+          <span className="client-menu-burger-icon" aria-hidden="true">
+            ☰
+          </span>
+          <span>Menu</span>
+        </button>
+        <button
+          type="button"
+          className={`client-menu-bar-btn client-menu-bar-cart ${cartCount > 0 ? "client-menu-bar-cart-active" : ""}`}
+          onClick={() => {
+            setSheetTab("cart");
+            setSheetOpen(true);
+          }}
+        >
+          <span className="client-menu-cart-label">Panier</span>
+          {cartCount > 0 ? (
+            <>
+              <span className="client-menu-cart-badge">{cartCount}</span>
+              <span className="client-menu-cart-total">{(total / 100).toFixed(2)} €</span>
+            </>
+          ) : (
+            <span className="client-menu-cart-empty">Vide</span>
+          )}
+        </button>
+      </div>
+
+      {sheetOpen && (
+        <div className="client-menu-sheet-root" role="dialog" aria-modal="true" aria-label="Menu et panier">
+          <button type="button" className="client-menu-sheet-backdrop" aria-label="Fermer" onClick={() => setSheetOpen(false)} />
+          <div className="client-menu-sheet">
+            <div className="client-menu-sheet-header">
+              <div className="client-menu-sheet-tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={sheetTab === "nav"}
+                  className={sheetTab === "nav" ? "active" : ""}
+                  onClick={() => setSheetTab("nav")}
+                >
+                  Catégories
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={sheetTab === "cart"}
+                  className={sheetTab === "cart" ? "active" : ""}
+                  onClick={() => setSheetTab("cart")}
+                >
+                  Panier {cartCount > 0 ? `(${cartCount})` : ""}
+                </button>
+              </div>
+              <button type="button" className="client-menu-sheet-close btn-secondary" onClick={() => setSheetOpen(false)}>
+                Fermer
               </button>
+            </div>
+
+            {sheetTab === "nav" && (
+              <div className="client-menu-sheet-body client-menu-sheet-nav">
+                <p className="muted" style={{ margin: "0 0 0.75rem" }}>
+                  Touche une catégorie pour y aller.
+                </p>
+                <ul className="client-menu-nav-list">
+                  {menu.categories.map((cat) => (
+                    <li key={cat.id}>
+                      <button type="button" className="client-menu-nav-item" onClick={() => scrollToCategory(cat.id)}>
+                        <span>{cat.name}</span>
+                        <span className="muted">{cat.items.length} plats</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
-            <button
-              disabled={cart.length === 0}
-              onClick={async () => {
-                const payload = {
-                  restaurantSlug: resolved.restaurantSlug,
-                  tableToken: resolved.tableToken,
-                  items: cart.map((c) => ({
-                    menuItemId: c.menuItemId,
-                    quantity: c.quantity,
-                    optionIds: c.optionIds
-                  }))
-                };
-                const order = await apiFetch<{
-                  id: string;
-                  status: string;
-                  orderNumber: number;
-                  totalCents: number;
-                  items: PlacedOrderLine[];
-                }>("/public/orders", {
-                  method: "POST",
-                  body: JSON.stringify(payload)
-                });
-                setOrderId(order.id);
-                setOrderStatus(order.status);
-                setOrderNumber(order.orderNumber);
-                setPlacedItems(order.items);
-                setPlacedTotal(order.totalCents);
-                setCart([]);
-              }}
-            >
-              Commander
-            </button>
+
+            {sheetTab === "cart" && (
+              <div className="client-menu-sheet-body client-menu-sheet-cart">
+                {cart.length === 0 ? (
+                  <p className="muted" style={{ margin: 0 }}>
+                    Ton panier est vide. Ajoute des plats depuis le menu.
+                  </p>
+                ) : (
+                  <>
+                    <div className="cart-lines client-menu-cart-lines">
+                      {cart.map((line, idx) => (
+                        <div key={`${line.menuItemId}-${idx}`} className="cart-line">
+                          <div className="cart-line-info">
+                            <strong>{line.name}</strong>
+                            {line.optionNames.length > 0 && (
+                              <span className="muted">{line.optionNames.join(", ")}</span>
+                            )}
+                            <span className="muted">{(line.unitPriceCents / 100).toFixed(2)} EUR / unité</span>
+                          </div>
+                          <div className="cart-line-actions">
+                            <div className="qty-stepper">
+                              <button
+                                type="button"
+                                className="btn-secondary qty-btn"
+                                onClick={() =>
+                                  setCart((prev) =>
+                                    prev
+                                      .map((c, i) => (i === idx ? { ...c, quantity: c.quantity - 1 } : c))
+                                      .filter((c) => c.quantity > 0)
+                                  )
+                                }
+                                aria-label="Diminuer"
+                              >
+                                −
+                              </button>
+                              <span className="qty-value">{line.quantity}</span>
+                              <button
+                                type="button"
+                                className="btn-secondary qty-btn"
+                                onClick={() =>
+                                  setCart((prev) =>
+                                    prev.map((c, i) => (i === idx ? { ...c, quantity: c.quantity + 1 } : c))
+                                  )
+                                }
+                                aria-label="Augmenter"
+                              >
+                                +
+                              </button>
+                            </div>
+                            <strong className="cart-line-total">
+                              {((line.unitPriceCents * line.quantity) / 100).toFixed(2)} EUR
+                            </strong>
+                            <button
+                              type="button"
+                              className="btn-danger qty-btn"
+                              onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}
+                              aria-label="Retirer"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="client-menu-cart-footer">
+                      <div className="row-between" style={{ width: "100%" }}>
+                        <strong>Total</strong>
+                        <strong>{(total / 100).toFixed(2)} EUR</strong>
+                      </div>
+                      <div className="client-menu-cart-actions">
+                        <button type="button" className="btn-secondary" onClick={() => setCart([])}>
+                          Vider
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await submitOrder();
+                            } catch (e) {
+                              console.error(e);
+                              window.alert("Impossible d'envoyer la commande. Réessaie.");
+                            }
+                          }}
+                        >
+                          Commander
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
-
-        {cart.length > 0 && (
-          <div className="cart-lines">
-            {cart.map((line, idx) => (
-              <div key={`${line.menuItemId}-${idx}`} className="cart-line">
-                <div className="cart-line-info">
-                  <strong>{line.name}</strong>
-                  {line.optionNames.length > 0 && (
-                    <span className="muted">{line.optionNames.join(", ")}</span>
-                  )}
-                  <span className="muted">
-                    {(line.unitPriceCents / 100).toFixed(2)} EUR / unite
-                  </span>
-                </div>
-                <div className="cart-line-actions">
-                  <div className="qty-stepper">
-                    <button
-                      type="button"
-                      className="btn-secondary qty-btn"
-                      onClick={() =>
-                        setCart((prev) =>
-                          prev
-                            .map((c, i) =>
-                              i === idx ? { ...c, quantity: c.quantity - 1 } : c
-                            )
-                            .filter((c) => c.quantity > 0)
-                        )
-                      }
-                      aria-label="Diminuer"
-                    >
-                      −
-                    </button>
-                    <span className="qty-value">{line.quantity}</span>
-                    <button
-                      type="button"
-                      className="btn-secondary qty-btn"
-                      onClick={() =>
-                        setCart((prev) =>
-                          prev.map((c, i) =>
-                            i === idx ? { ...c, quantity: c.quantity + 1 } : c
-                          )
-                        )
-                      }
-                      aria-label="Augmenter"
-                    >
-                      +
-                    </button>
-                  </div>
-                  <strong className="cart-line-total">
-                    {((line.unitPriceCents * line.quantity) / 100).toFixed(2)} EUR
-                  </strong>
-                  <button
-                    type="button"
-                    className="btn-danger qty-btn"
-                    onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}
-                    aria-label="Retirer"
-                    title="Retirer du panier"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      )}
 
       {orderId && (
-        <section className="panel order-ticket">
+        <section className="panel order-ticket client-menu-ticket">
           <div className="row-between">
             <h3 className="panel-title">Commande envoyée</h3>
             <span className={`status ${statusClass(orderStatus)}`}>{orderStatus}</span>
           </div>
           {orderNumber && <p className="muted">Commande #{orderNumber}</p>}
           <p className="muted">Table: {menu.table.name}</p>
-          <p className="muted">ID: {orderId}</p>
           <p className="muted">Total: {(placedTotal / 100).toFixed(2)} EUR</p>
           <div className="stack" style={{ marginTop: 8 }}>
             {placedItems.map((line) => (
@@ -288,7 +395,9 @@ export default function PublicMenuPage({
                 </div>
                 {line.options.length > 0 && (
                   <p className="muted">
-                    {line.options.map((o) => `${o.nameSnapshot} (+${(o.priceDeltaCents / 100).toFixed(2)} EUR)`).join(", ")}
+                    {line.options
+                      .map((o) => `${o.nameSnapshot} (+${(o.priceDeltaCents / 100).toFixed(2)} EUR)`)
+                      .join(", ")}
                   </p>
                 )}
               </div>
