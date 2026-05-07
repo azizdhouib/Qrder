@@ -463,10 +463,19 @@ app.get("/public/orders/:id/status", async (req, res) => {
 });
 
 app.get("/kitchen/orders", authRequired, async (req, res) => {
-  const orders = await db.order.findMany({
+  const includeRecentServed = req.query.includeRecentServed === "true";
+  const recentMinutes = Number(req.query.recentMinutes) || 60;
+
+  const activeStatuses: OrderStatus[] = [
+    OrderStatus.PLACED,
+    OrderStatus.PREPARING,
+    OrderStatus.READY
+  ];
+
+  const active = await db.order.findMany({
     where: {
       restaurantId: req.user!.restaurantId,
-      status: { in: [OrderStatus.PLACED, OrderStatus.PREPARING, OrderStatus.READY] }
+      status: { in: activeStatuses }
     },
     include: {
       table: true,
@@ -474,7 +483,27 @@ app.get("/kitchen/orders", authRequired, async (req, res) => {
     },
     orderBy: { createdAt: "asc" }
   });
-  res.json(orders);
+
+  if (!includeRecentServed) {
+    return res.json(active);
+  }
+
+  const since = new Date(Date.now() - recentMinutes * 60 * 1000);
+  const recentServed = await db.order.findMany({
+    where: {
+      restaurantId: req.user!.restaurantId,
+      status: OrderStatus.SERVED,
+      createdAt: { gte: since }
+    },
+    include: {
+      table: true,
+      items: { include: { options: true } }
+    },
+    orderBy: { createdAt: "desc" },
+    take: 12
+  });
+
+  res.json([...active, ...recentServed]);
 });
 
 app.get("/orders/history", authRequired, async (req, res) => {

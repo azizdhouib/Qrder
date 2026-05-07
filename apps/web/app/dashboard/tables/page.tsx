@@ -49,42 +49,52 @@ function TablesManager({ token }: { token: string }) {
   return (
     <div className="stack">
       <div className="panel">
-        <h3 className="panel-title">Ajouter une table</h3>
-        <input value={name} onChange={(e) => setName(e.target.value)} />
-        <div style={{ marginTop: 8 }}>
+        <h3 className="panel-title" style={{ marginBottom: 6 }}>
+          Ajouter une table
+        </h3>
+        <p className="muted" style={{ margin: "0 0 10px" }}>
+          Donne un nom court (ex. T1, T2, Terrasse 3) - un QR unique sera généré.
+        </p>
+        <div className="tables-add-row">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Nom de la table"
+          />
           <button
             onClick={async () => {
+              if (!name.trim()) return;
               await apiFetch("/tables", {
                 method: "POST",
                 headers: { Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ name })
+                body: JSON.stringify({ name: name.trim() })
               });
               setName("");
               await load();
             }}
           >
-            Créer
+            Créer la table
           </button>
         </div>
       </div>
 
-      <div className="grid grid-2">
+      <div className="tables-grid">
         {tables.map((table) => (
-          <div key={table.id} className="panel">
-            <div className="row-between">
-              <strong>{table.name}</strong>
+          <div key={table.id} className="panel table-card">
+            <div className="table-card-header">
+              <div className="table-card-title">
+                <span className="table-card-icon" aria-hidden="true">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/table.png" alt="" />
+                </span>
+                <span className="table-card-name">{table.name}</span>
+              </div>
               <span className="pill">QR prêt</span>
             </div>
-            <p className="muted">Token: {table.qrToken.slice(0, 12)}...</p>
-            {restaurantSlug && origin && (
-              <p className="muted">
-                URL client: {origin}/r/{restaurantSlug}/t/{table.qrToken}
-              </p>
-            )}
-            <div className="row">
+            <div className="table-card-actions">
               {restaurantSlug && origin && (
                 <button
-                  className="btn-secondary"
+                  className="btn-secondary table-action"
                   onClick={() =>
                     window.open(
                       `${origin}/r/${restaurantSlug}/t/${table.qrToken}`,
@@ -92,28 +102,27 @@ function TablesManager({ token }: { token: string }) {
                     )
                   }
                 >
-                  Ouvrir interface client
+                  <span aria-hidden="true">🔗</span>
+                  Ouvrir l&apos;interface client
                 </button>
               )}
-              {restaurantSlug && origin && (
-                <button
-                  className="btn-secondary"
-                  onClick={() =>
-                    navigator.clipboard.writeText(`${origin}/r/${restaurantSlug}/t/${table.qrToken}`)
-                  }
-                >
-                  Copier lien client
-                </button>
-              )}
+              <button
+                className="table-action"
+                onClick={() => downloadQr(table.id, table.name, token)}
+              >
+                <span aria-hidden="true">⬇</span>
+                Télécharger le QR
+              </button>
             </div>
-            <button
-              className="btn-secondary"
-              onClick={() => downloadQr(table.id, table.name, token)}
-            >
-              Télécharger QR
-            </button>
           </div>
         ))}
+        {tables.length === 0 && (
+          <div className="panel">
+            <p className="muted" style={{ margin: 0 }}>
+              Aucune table - crée la première ci-dessus.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

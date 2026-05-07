@@ -153,47 +153,118 @@ export default function PublicMenuPage({
       <section className="cart-sticky">
         <div className="row-between">
           <div>
-            <strong>Panier ({cart.length})</strong>
-            <p className="muted">Total: {(total / 100).toFixed(2)} EUR</p>
+            <strong>Panier ({cart.reduce((acc, l) => acc + l.quantity, 0)})</strong>
+            <p className="muted" style={{ margin: 0 }}>Total: {(total / 100).toFixed(2)} EUR</p>
           </div>
-          <button
-            disabled={cart.length === 0}
-            onClick={async () => {
-              const payload = {
-                restaurantSlug: resolved.restaurantSlug,
-                tableToken: resolved.tableToken,
-                items: cart.map((c) => ({
-                  menuItemId: c.menuItemId,
-                  quantity: c.quantity,
-                  optionIds: c.optionIds
-                }))
-              };
-              const order = await apiFetch<{
-                id: string;
-                status: string;
-                orderNumber: number;
-                totalCents: number;
-                items: PlacedOrderLine[];
-              }>("/public/orders", {
-                method: "POST",
-                body: JSON.stringify(payload)
-              });
-              setOrderId(order.id);
-              setOrderStatus(order.status);
-              setOrderNumber(order.orderNumber);
-              setPlacedItems(order.items);
-              setPlacedTotal(order.totalCents);
-              setCart([]);
-            }}
-          >
-            Commander
-          </button>
+          <div className="row" style={{ gap: 6 }}>
+            {cart.length > 0 && (
+              <button
+                className="btn-secondary"
+                onClick={() => setCart([])}
+                title="Vider le panier"
+              >
+                Vider
+              </button>
+            )}
+            <button
+              disabled={cart.length === 0}
+              onClick={async () => {
+                const payload = {
+                  restaurantSlug: resolved.restaurantSlug,
+                  tableToken: resolved.tableToken,
+                  items: cart.map((c) => ({
+                    menuItemId: c.menuItemId,
+                    quantity: c.quantity,
+                    optionIds: c.optionIds
+                  }))
+                };
+                const order = await apiFetch<{
+                  id: string;
+                  status: string;
+                  orderNumber: number;
+                  totalCents: number;
+                  items: PlacedOrderLine[];
+                }>("/public/orders", {
+                  method: "POST",
+                  body: JSON.stringify(payload)
+                });
+                setOrderId(order.id);
+                setOrderStatus(order.status);
+                setOrderNumber(order.orderNumber);
+                setPlacedItems(order.items);
+                setPlacedTotal(order.totalCents);
+                setCart([]);
+              }}
+            >
+              Commander
+            </button>
+          </div>
         </div>
-        {cart.map((line, idx) => (
-          <p key={`${line.menuItemId}-${idx}`} className="muted" style={{ margin: "0.35rem 0 0" }}>
-            {line.quantity}x {line.name} {line.optionNames.length > 0 ? `(${line.optionNames.join(", ")})` : ""}
-          </p>
-        ))}
+
+        {cart.length > 0 && (
+          <div className="cart-lines">
+            {cart.map((line, idx) => (
+              <div key={`${line.menuItemId}-${idx}`} className="cart-line">
+                <div className="cart-line-info">
+                  <strong>{line.name}</strong>
+                  {line.optionNames.length > 0 && (
+                    <span className="muted">{line.optionNames.join(", ")}</span>
+                  )}
+                  <span className="muted">
+                    {(line.unitPriceCents / 100).toFixed(2)} EUR / unite
+                  </span>
+                </div>
+                <div className="cart-line-actions">
+                  <div className="qty-stepper">
+                    <button
+                      type="button"
+                      className="btn-secondary qty-btn"
+                      onClick={() =>
+                        setCart((prev) =>
+                          prev
+                            .map((c, i) =>
+                              i === idx ? { ...c, quantity: c.quantity - 1 } : c
+                            )
+                            .filter((c) => c.quantity > 0)
+                        )
+                      }
+                      aria-label="Diminuer"
+                    >
+                      −
+                    </button>
+                    <span className="qty-value">{line.quantity}</span>
+                    <button
+                      type="button"
+                      className="btn-secondary qty-btn"
+                      onClick={() =>
+                        setCart((prev) =>
+                          prev.map((c, i) =>
+                            i === idx ? { ...c, quantity: c.quantity + 1 } : c
+                          )
+                        )
+                      }
+                      aria-label="Augmenter"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <strong className="cart-line-total">
+                    {((line.unitPriceCents * line.quantity) / 100).toFixed(2)} EUR
+                  </strong>
+                  <button
+                    type="button"
+                    className="btn-danger qty-btn"
+                    onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}
+                    aria-label="Retirer"
+                    title="Retirer du panier"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {orderId && (

@@ -4,9 +4,9 @@
 
 :root {
   /* Surfaces - warm cream / ivory inspired by light wood interior */
-  --bg: #F2E9D5;
-  --bg-elevated: #FBF5E7;
-  --bg-soft: #ECE0C6;
+  --bg: #E2DAC4;
+  --bg-elevated: #F7EFDB;
+  --bg-soft: #D7CDB6;
   --bg-warm: #E5D6B7;
 
   /* Text */
@@ -754,5 +754,204 @@ textarea:focus {
 @media (max-width: 600px) {
   .form-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ====== Cart (client public) ====== */
+.cart-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+  max-height: 38vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.cart-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #FFFAEC;
+  flex-wrap: wrap;
+}
+
+.cart-line-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.cart-line-info strong {
+  font-size: 0.95rem;
+}
+
+.cart-line-info .muted {
+  font-size: 0.78rem;
+}
+
+.cart-line-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.qty-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-elevated);
+}
+
+.qty-btn {
+  min-height: 32px !important;
+  min-width: 32px;
+  padding: 0 0.55rem !important;
+  font-size: 0.95rem !important;
+  border-radius: 999px;
+}
+
+.qty-value {
+  min-width: 22px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.cart-line-total {
+  min-width: 70px;
+  text-align: right;
+  font-size: 0.92rem;
+}
+
+/* ====== Kitchen recently served ====== */
+.kitchen-order-served {
+  background: #F0E5D0;
+  border-style: dashed;
+  opacity: 0.92;
+}
+
+/* ====== Tables (gestion + QR) ====== */
+.tables-add-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.tables-add-row button {
+  white-space: nowrap;
+  padding: 0 1.1rem;
+}
+
+.tables-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.1rem;
+}
+
+.table-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.95rem;
+  padding: 1.2rem 1.25rem;
+  min-height: 200px;
+}
+
+.table-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px dashed var(--line);
+}
+
+.table-card-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.table-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #FFFAEC;
+  border: 1px solid var(--line);
+  flex: 0 0 auto;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(31, 20, 10, 0.08);
+}
+
+.table-card-icon img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.table-card-name {
+  font-family: var(--font-display), Fraunces, Georgia, serif;
+  font-size: 1.55rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.table-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: auto;
+}
+
+.table-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  width: 100%;
+  min-height: 50px;
+  padding: 0 1rem;
+  font-size: 0.95rem;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.table-action span[aria-hidden="true"] {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+@media (max-width: 520px) {
+  .tables-add-row {
+    grid-template-columns: 1fr;
+  }
+  .tables-add-row button {
+    width: 100%;
+  }
+}
+
+@media (min-width: 1100px) {
+  .tables-grid {
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  }
+  .table-action {
+    min-height: 52px;
+    font-size: 0.97rem;
   }
 }
