@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { UserRole } from "@prisma/client";
@@ -14,6 +14,16 @@ function slugify(value: string) {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
+}
+
+function generateTempPassword(): string {
+  const alphabet = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const buf = randomBytes(16);
+  let out = "";
+  for (let i = 0; i < 12; i++) {
+    out += alphabet[buf[i]! % alphabet.length]!;
+  }
+  return out;
 }
 
 function adminKeyMatches(expected: string, provided: string): boolean {
@@ -101,6 +111,31 @@ export function createAdminRouter(): Router {
         suspended: true,
         createdAt: true,
         _count: { select: { users: true } }
+      },
+      orderBy: { name: "asc" }
+    });
+    res.json(rows);
+  });
+
+  /** Restaurants avec tous les comptes équipe (sans secret) — console super admin. */
+  r.get("/directory", async (_req, res) => {
+    const rows = await db.restaurant.findMany({
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        currency: true,
+        suspended: true,
+        createdAt: true,
+        users: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            createdAt: true
+          },
+          orderBy: [{ role: "asc" }, { email: "asc" }]
+        }
       },
       orderBy: { name: "asc" }
     });
@@ -257,6 +292,37 @@ export function createAdminRouter(): Router {
       }
     });
     res.json(restaurant);
+  });
+
+  /** Définit un nouveau mot de passe généré et le renvoie une seule fois (support super admin). */
+  r.post("/users/:userId/reset-password", async (req, res) => {
+    const userIdRaw = req.params.userId;
+    const userId = Array.isArray(userIdRaw) ? userIdRaw[0] : userIdRaw;
+    if (!userId?.trim()) {
+      return res.status(400).json({ message: "Identifiant utilisateur requis." });
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, role: true, restaurantId: true }
+    });
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur introuvable." });
+    }
+
+    const plain = generateTempPassword();
+    const passwordHash = await bcrypt.hash(plain, 10);
+    await db.user.update({
+      where: { id: user.id },
+      data: { passwordHash }
+    });
+
+    return res.json({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      password: plain
+    });
   });
 
   r.delete("/restaurants/:id", async (req, res) => {

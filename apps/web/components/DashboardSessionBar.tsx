@@ -1,8 +1,26 @@
 "use client";
 
-export function DashboardSessionBar({ onLogout }: { onLogout: () => void }) {
+import Link from "next/link";
+
+export function DashboardSessionBar({
+  onLogout,
+  showStaffSettings
+}: {
+  onLogout: () => void;
+  showStaffSettings?: boolean;
+}) {
   return (
     <div className="dashboard-top-actions">
+      {showStaffSettings && (
+        <details className="dashboard-settings">
+          <summary className="dashboard-settings-summary">Paramètres</summary>
+          <div className="dashboard-settings-popover" role="menu">
+            <Link href="/dashboard/comptes" className="dashboard-settings-item" role="menuitem">
+              Comptes
+            </Link>
+          </div>
+        </details>
+      )}
       <button type="button" className="dashboard-logout-btn" onClick={onLogout}>
         <svg
           className="dashboard-logout-icon"

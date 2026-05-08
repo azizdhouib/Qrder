@@ -6,7 +6,7 @@ import cors from "cors";
 import express from "express";
 import QRCode from "qrcode";
 import { Server } from "socket.io";
-import { OrderStatus } from "@prisma/client";
+import { OrderStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { authRequired, requireRoles, signAuthToken } from "./auth.js";
 import { createAdminRouter } from "./adminRoutes.js";
@@ -112,6 +112,7 @@ app.get("/me", authRequired, async (req, res) => {
   });
   if (!restaurant) return res.status(404).json({ message: "Restaurant not found" });
   res.json({
+    userId: req.user!.userId,
     role: req.user!.role,
     restaurant: {
       id: restaurant.id,
@@ -121,6 +122,93 @@ app.get("/me", authRequired, async (req, res) => {
       suspended: restaurant.suspended
     }
   });
+});
+
+app.get("/team/users", authRequired, staffOnly, async (req, res) => {
+  const users = await db.user.findMany({
+    where: { restaurantId: req.user!.restaurantId },
+    select: { id: true, email: true, role: true, createdAt: true },
+    orderBy: [{ role: "asc" }, { email: "asc" }]
+  });
+  res.json(users);
+});
+
+const teamUserCreateSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+  role: z.enum(["MANAGER", "KITCHEN"])
+});
+
+app.post("/team/users", authRequired, staffOnly, async (req, res) => {
+  const parsed = teamUserCreateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: "Payload invalide", issues: parsed.error.issues });
+  }
+
+  if (req.user!.role === "MANAGER" && parsed.data.role === "MANAGER") {
+    return res.status(403).json({
+      message: "Seul le propriétaire peut créer un compte gérant."
+    });
+  }
+
+  const email = parsed.data.email.toLowerCase();
+  const existing = await db.user.findUnique({ where: { email } });
+  if (existing) {
+    return res.status(409).json({ message: "Cet email est déjà utilisé." });
+  }
+
+  const role =
+    parsed.data.role === "MANAGER" ? UserRole.MANAGER : UserRole.KITCHEN;
+
+  const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+  const user = await db.user.create({
+    data: {
+      email,
+      passwordHash,
+      role,
+      restaurantId: req.user!.restaurantId
+    }
+  });
+
+  return res.status(201).json({
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    createdAt: user.createdAt
+  });
+});
+
+app.delete("/team/users/:id", authRequired, staffOnly, async (req, res) => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  if (!id?.trim()) {
+    return res.status(400).json({ message: "Identifiant requis." });
+  }
+
+  if (id === req.user!.userId) {
+    return res.status(400).json({ message: "Tu ne peux pas supprimer ton propre compte." });
+  }
+
+  const target = await db.user.findFirst({
+    where: { id, restaurantId: req.user!.restaurantId }
+  });
+  if (!target) {
+    return res.status(404).json({ message: "Utilisateur introuvable." });
+  }
+
+  if (target.role === UserRole.OWNER) {
+    return res.status(403).json({
+      message: "Le compte propriétaire ne peut pas être supprimé depuis cette interface."
+    });
+  }
+
+  if (req.user!.role === "MANAGER" && target.role !== UserRole.KITCHEN) {
+    return res.status(403).json({
+      message: "Avec un compte gérant, tu ne peux supprimer que des comptes cuisine."
+    });
+  }
+
+  await db.user.delete({ where: { id } });
+  res.status(204).send();
 });
 
 app.get("/me/restaurant", authRequired, async (req, res) => {

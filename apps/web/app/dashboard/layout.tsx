@@ -34,7 +34,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
   const [token, setToken] = useState<string | null>(null);
-  const [session, setSession] = useState<{ role: UserRole; restaurantName: string } | null>(null);
+  const [session, setSession] = useState<{
+    role: UserRole;
+    restaurantName: string;
+    userId: string;
+  } | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
 
   const isAuthPage = useMemo(() => pathname === "/dashboard/auth", [pathname]);
@@ -65,11 +69,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
 
     setSessionReady(false);
-    apiFetch<{ role: UserRole; restaurant: { name: string } }>("/me", {
+    apiFetch<{ userId: string; role: UserRole; restaurant: { name: string } }>("/me", {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then((r) => {
-        setSession({ role: r.role, restaurantName: r.restaurant.name });
+        setSession({ role: r.role, restaurantName: r.restaurant.name, userId: r.userId });
         setSessionReady(true);
       })
       .catch(() => {
@@ -129,6 +133,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               </div>
               <DashboardNav items={navItems} pathname={pathname} />
               <DashboardSessionBar
+                showStaffSettings={session.role !== "KITCHEN"}
                 onLogout={() => {
                   localStorage.removeItem("qrder_token");
                   router.replace("/dashboard/auth");

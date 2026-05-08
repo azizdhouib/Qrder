@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { LandingPhoneMock } from "@/components/LandingPhoneMock";
 
 export const metadata: Metadata = {
   title: "Qrder — Le service, simplifié.",
@@ -46,6 +47,10 @@ export default function HomePage() {
           </a>
         </div>
       </section>
+
+      <div className="landing-phone-showcase container landing-container">
+        <LandingPhoneMock />
+      </div>
 
       <section id="fonctionnement" className="landing-section container landing-container">
         <h2 className="landing-section-title">Fonctionnement</h2>
@@ -116,52 +121,6 @@ export default function HomePage() {
           </li>
         </ul>
       </section>
-
-      <div className="landing-phone-wrap container landing-container">
-        <div className="landing-phone" aria-hidden="true">
-          <div className="landing-phone-bezel">
-            <div className="landing-phone-notch" />
-            <div className="landing-phone-screen">
-              <header className="landing-phone-header">
-                <span className="landing-phone-brand">La Trattoria</span>
-                <span className="landing-phone-menu-label">Menu</span>
-              </header>
-              <ul className="landing-phone-list">
-                <li>
-                  <div>
-                    <span className="landing-phone-item-name">Burrata di Puglia</span>
-                    <span className="landing-phone-item-desc">Tomates, basilic, huile d&apos;olive</span>
-                  </div>
-                  <span className="landing-phone-item-meta">
-                    <span className="landing-phone-price">12,00 €</span>
-                    <span className="landing-phone-plus">+</span>
-                  </span>
-                </li>
-                <li>
-                  <div>
-                    <span className="landing-phone-item-name">Tagliatelles truffe</span>
-                    <span className="landing-phone-item-desc">Crème, parmesan, truffe noire</span>
-                  </div>
-                  <span className="landing-phone-item-meta">
-                    <span className="landing-phone-price">22,00 €</span>
-                    <span className="landing-phone-plus">+</span>
-                  </span>
-                </li>
-                <li>
-                  <div>
-                    <span className="landing-phone-item-name">Tiramisu maison</span>
-                    <span className="landing-phone-item-desc">Café, mascarpone, cacao</span>
-                  </div>
-                  <span className="landing-phone-item-meta">
-                    <span className="landing-phone-price">8,50 €</span>
-                    <span className="landing-phone-plus">+</span>
-                  </span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <footer className="landing-footer">
         <div className="container landing-container landing-footer-inner">
