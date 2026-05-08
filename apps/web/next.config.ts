@@ -1,4 +1,18 @@
+import { existsSync } from "node:fs";
 import type { NextConfig } from "next";
+import path from "node:path";
+import { config as loadEnv } from "dotenv";
+
+const cwd = process.cwd();
+for (const dir of [cwd, path.join(cwd, ".."), path.join(cwd, "apps", "web")]) {
+  const base = path.normalize(dir);
+  for (const name of [".env", ".env.local"] as const) {
+    const full = path.join(base, name);
+    if (existsSync(full)) {
+      loadEnv({ path: full, override: false });
+    }
+  }
+}
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
 const isCloudDeploy =
@@ -14,7 +28,6 @@ if (process.env.NODE_ENV === "production" && !apiUrl) {
         "(ex. https://api-production-xxxx.up.railway.app). Sans ça le bundle utilise localhost:4000."
     );
   }
-  // Build local (ex. `next build` / runtime:stable) : les variables ne sont souvent pas chargées depuis la racine du monorepo.
   // eslint-disable-next-line no-console
   console.warn(
     "[next.config] NEXT_PUBLIC_API_URL absent au build — le bundle utilisera http://localhost:4000 (OK pour runtime:stable). " +

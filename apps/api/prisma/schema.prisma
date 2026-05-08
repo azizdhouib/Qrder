@@ -31,6 +31,7 @@ model Restaurant {
   name       String
   slug       String         @unique
   currency   String         @default("EUR")
+  suspended  Boolean        @default(false)
   createdAt  DateTime       @default(now())
   users      User[]
   tables     Table[]
@@ -51,6 +52,16 @@ model User {
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@map("qr_users")
+}
+
+/// Administrateur plateforme (Qrder) — sans restaurant, accès /admin via JWT ou ADMIN_API_KEY.
+model PlatformAdmin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  @@map("qr_platform_admins")
 }
 
 model Table {

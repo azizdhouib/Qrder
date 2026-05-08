@@ -12,6 +12,19 @@ async function main() {
     create: { name: "Demo Bistro", slug: "demo-bistro" }
   });
 
+  const platformEmail = process.env.PLATFORM_ADMIN_EMAIL?.trim().toLowerCase();
+  const platformPassword = process.env.PLATFORM_ADMIN_PASSWORD;
+  if (platformEmail && platformPassword && platformPassword.length >= 8) {
+    const ph = await bcrypt.hash(platformPassword, 10);
+    await db.platformAdmin.upsert({
+      where: { email: platformEmail },
+      update: { passwordHash: ph },
+      create: { email: platformEmail, passwordHash: ph }
+    });
+    // eslint-disable-next-line no-console
+    console.log("Super admin plateforme:", platformEmail, "(mot de passe depuis PLATFORM_ADMIN_PASSWORD)");
+  }
+
   await db.user.upsert({
     where: { email: "owner@demo.com" },
     update: {},
@@ -19,6 +32,17 @@ async function main() {
       email: "owner@demo.com",
       passwordHash,
       role: "OWNER",
+      restaurantId: restaurant.id
+    }
+  });
+
+  await db.user.upsert({
+    where: { email: "kitchen@demo.com" },
+    update: { passwordHash, role: "KITCHEN" },
+    create: {
+      email: "kitchen@demo.com",
+      passwordHash,
+      role: "KITCHEN",
       restaurantId: restaurant.id
     }
   });
@@ -48,7 +72,7 @@ async function main() {
   });
 
   // eslint-disable-next-line no-console
-  console.log("Seed done. Table token:", table.qrToken);
+  console.log("Seed done. Owner owner@demo.com / Cuisine kitchen@demo.com (même mot de passe demo). Table token:", table.qrToken);
 }
 
 main()

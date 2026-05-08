@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./loadEnvFirst.js";
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
@@ -8,7 +8,8 @@ import QRCode from "qrcode";
 import { Server } from "socket.io";
 import { OrderStatus } from "@prisma/client";
 import { z } from "zod";
-import { authRequired, signAuthToken } from "./auth.js";
+import { authRequired, requireRoles, signAuthToken } from "./auth.js";
+import { createAdminRouter } from "./adminRoutes.js";
 import { db } from "./db.js";
 
 const corsOrigins = (process.env.WEB_ORIGIN ?? "*")
@@ -24,6 +25,8 @@ const corsOption =
 const app = express();
 app.use(cors(corsOption));
 app.use(express.json({ limit: "8mb" }));
+
+const staffOnly = requireRoles("OWNER", "MANAGER");
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: corsOption });
@@ -50,50 +53,13 @@ app.get("/health", async (_req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/auth/register", async (req, res) => {
-  const body = z
-    .object({
-      email: z.string().email(),
-      password: z.string().min(6),
-      restaurantName: z.string().min(2)
-    })
-    .safeParse(req.body);
+app.use("/admin", createAdminRouter());
 
-  if (!body.success) {
-    return res.status(400).json({ message: "Invalid payload", issues: body.error.issues });
-  }
-
-  const email = body.data.email.toLowerCase();
-  const passwordHash = await bcrypt.hash(body.data.password, 10);
-  const baseSlug = slugify(body.data.restaurantName);
-  const slug = `${baseSlug}-${Math.floor(Math.random() * 10_000)}`;
-
-  try {
-    const data = await db.$transaction(async (tx) => {
-      const restaurant = await tx.restaurant.create({
-        data: { name: body.data.restaurantName, slug }
-      });
-      const user = await tx.user.create({
-        data: {
-          email,
-          passwordHash,
-          role: "OWNER",
-          restaurantId: restaurant.id
-        }
-      });
-      return { user, restaurant };
-    });
-
-    const token = signAuthToken({
-      userId: data.user.id,
-      restaurantId: data.restaurant.id,
-      role: data.user.role
-    });
-
-    return res.status(201).json({ token, restaurant: data.restaurant, userId: data.user.id });
-  } catch {
-    return res.status(409).json({ message: "Email already used" });
-  }
+app.post("/auth/register", (_req, res) => {
+  res.status(403).json({
+    message:
+      "Inscription publique désactivée. Les comptes restaurant et équipe sont créés par l’administrateur."
+  });
 });
 
 app.post("/auth/login", async (req, res) => {
@@ -117,6 +83,12 @@ app.post("/auth/login", async (req, res) => {
   const isValid = await bcrypt.compare(body.data.password, user.passwordHash);
   if (!isValid) return res.status(401).json({ message: "Invalid credentials" });
 
+  if (user.restaurant.suspended) {
+    return res.status(403).json({
+      message: "Cet établissement est suspendu. Contacte l’administrateur Qrder."
+    });
+  }
+
   const token = signAuthToken({
     userId: user.id,
     restaurantId: user.restaurantId,
@@ -125,10 +97,28 @@ app.post("/auth/login", async (req, res) => {
 
   return res.json({
     token,
+    role: user.role,
     restaurant: {
       id: user.restaurant.id,
       name: user.restaurant.name,
       slug: user.restaurant.slug
+    }
+  });
+});
+
+app.get("/me", authRequired, async (req, res) => {
+  const restaurant = await db.restaurant.findUnique({
+    where: { id: req.user!.restaurantId }
+  });
+  if (!restaurant) return res.status(404).json({ message: "Restaurant not found" });
+  res.json({
+    role: req.user!.role,
+    restaurant: {
+      id: restaurant.id,
+      name: restaurant.name,
+      slug: restaurant.slug,
+      currency: restaurant.currency,
+      suspended: restaurant.suspended
     }
   });
 });
@@ -140,7 +130,7 @@ app.get("/me/restaurant", authRequired, async (req, res) => {
   res.json(restaurant);
 });
 
-app.post("/tables", authRequired, async (req, res) => {
+app.post("/tables", authRequired, staffOnly, async (req, res) => {
   const body = z.object({ name: z.string().min(1) }).safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Invalid payload" });
 
@@ -155,7 +145,7 @@ app.post("/tables", authRequired, async (req, res) => {
   res.status(201).json(table);
 });
 
-app.get("/tables", authRequired, async (req, res) => {
+app.get("/tables", authRequired, staffOnly, async (req, res) => {
   const tables = await db.table.findMany({
     where: { restaurantId: req.user!.restaurantId },
     orderBy: { name: "asc" }
@@ -163,7 +153,7 @@ app.get("/tables", authRequired, async (req, res) => {
   res.json(tables);
 });
 
-app.get("/tables/:id/qr", authRequired, async (req, res) => {
+app.get("/tables/:id/qr", authRequired, staffOnly, async (req, res) => {
   const tableId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const table = await db.table.findFirst({
     where: { id: tableId, restaurantId: req.user!.restaurantId },
@@ -177,7 +167,7 @@ app.get("/tables/:id/qr", authRequired, async (req, res) => {
   res.send(png);
 });
 
-app.post("/menu/categories", authRequired, async (req, res) => {
+app.post("/menu/categories", authRequired, staffOnly, async (req, res) => {
   const body = z.object({ name: z.string().min(1) }).safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Invalid payload" });
 
@@ -187,7 +177,7 @@ app.post("/menu/categories", authRequired, async (req, res) => {
   res.status(201).json(category);
 });
 
-app.patch("/menu/categories/:id", authRequired, async (req, res) => {
+app.patch("/menu/categories/:id", authRequired, staffOnly, async (req, res) => {
   const categoryId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const body = z
     .object({
@@ -210,7 +200,7 @@ app.patch("/menu/categories/:id", authRequired, async (req, res) => {
   res.json(updated);
 });
 
-app.delete("/menu/categories/:id", authRequired, async (req, res) => {
+app.delete("/menu/categories/:id", authRequired, staffOnly, async (req, res) => {
   const categoryId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
   const existing = await db.menuCategory.findFirst({
@@ -242,7 +232,7 @@ app.delete("/menu/categories/:id", authRequired, async (req, res) => {
   res.status(204).send();
 });
 
-app.post("/menu/items", authRequired, async (req, res) => {
+app.post("/menu/items", authRequired, staffOnly, async (req, res) => {
   const body = z
     .object({
       categoryId: z.string().min(1),
@@ -277,7 +267,7 @@ app.post("/menu/items", authRequired, async (req, res) => {
   res.status(201).json(item);
 });
 
-app.patch("/menu/items/:id", authRequired, async (req, res) => {
+app.patch("/menu/items/:id", authRequired, staffOnly, async (req, res) => {
   const itemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const body = z
     .object({
@@ -303,7 +293,7 @@ app.patch("/menu/items/:id", authRequired, async (req, res) => {
   res.json(updated);
 });
 
-app.delete("/menu/items/:id", authRequired, async (req, res) => {
+app.delete("/menu/items/:id", authRequired, staffOnly, async (req, res) => {
   const itemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
   const existing = await db.menuItem.findFirst({
@@ -325,7 +315,7 @@ app.delete("/menu/items/:id", authRequired, async (req, res) => {
   res.status(204).send();
 });
 
-app.get("/menu/full", authRequired, async (req, res) => {
+app.get("/menu/full", authRequired, staffOnly, async (req, res) => {
   const includeInactive = req.query.includeInactive === "true";
 
   const categories = await db.menuCategory.findMany({
@@ -354,6 +344,11 @@ app.get("/public/r/:restaurantSlug/t/:tableToken/menu", async (req, res) => {
     include: { restaurant: true }
   });
   if (!table) return res.status(404).json({ message: "Invalid QR code" });
+  if (table.restaurant.suspended) {
+    return res.status(403).json({
+      message: "Ce restaurant est temporairement indisponible."
+    });
+  }
 
   const categories = await db.menuCategory.findMany({
     where: { restaurantId: table.restaurantId, isActive: true },
@@ -396,6 +391,9 @@ app.post("/public/orders", async (req, res) => {
     include: { restaurant: true }
   });
   if (!table) return res.status(404).json({ message: "Table not found" });
+  if (table.restaurant.suspended) {
+    return res.status(403).json({ message: "Ce restaurant est temporairement indisponible." });
+  }
 
   const ids = body.data.items.map((i) => i.menuItemId);
   const menuItems = await db.menuItem.findMany({
@@ -555,7 +553,7 @@ app.get("/orders/history", authRequired, async (req, res) => {
 });
 
 /** Agrégats pour la vue « Pilotage » (CA, volumes, répartition) — plage en ISO côté client (fuseau du navigateur). */
-app.get("/dashboard/analytics", authRequired, async (req, res) => {
+app.get("/dashboard/analytics", authRequired, staffOnly, async (req, res) => {
   const fromRaw = typeof req.query.from === "string" ? req.query.from : undefined;
   const toRaw = typeof req.query.to === "string" ? req.query.to : undefined;
   if (!fromRaw || !toRaw) {

@@ -25,7 +25,7 @@ export function TokenGate({ children }: Props) {
           </span>
         </div>
         <p className="muted">
-          Colle ici la clé d&apos;accès affichée après connexion ou inscription lorsque le navigateur ne
+          Colle ici la clé d&apos;accès fournie après connexion sur la page équipe lorsque le navigateur ne
           l&apos;a pas enregistrée.
         </p>
         <input

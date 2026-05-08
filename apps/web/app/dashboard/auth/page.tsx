@@ -1,52 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { apiFetch } from "@/lib/api";
 
 type AuthResponse = {
   token: string;
+  role: "OWNER" | "MANAGER" | "KITCHEN";
   restaurant: { id: string; name: string; slug: string };
 };
 
 export default function AuthPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("owner@demo.com");
-  const [password, setPassword] = useState("demo1234");
-  const [restaurantName, setRestaurantName] = useState("Mon Resto");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const [mode, setMode] = useState<"login" | "register">("login");
-
-  async function handleRegister() {
-    try {
-      setErrorMessage("");
-      const result = await apiFetch<AuthResponse>("/auth/register", {
-        method: "POST",
-        body: JSON.stringify({ email, password, restaurantName })
-      });
-      localStorage.setItem("qrder_token", result.token);
-      setMessage(`Compte cree: ${result.restaurant.name}`);
-      router.push("/dashboard");
-    } catch (error) {
-      const text = error instanceof Error ? error.message : "";
-      if (text.includes("Email already used")) {
-        setErrorMessage("Cet identifiant est déjà utilisé.");
-      } else {
-        setErrorMessage("Impossible de créer le compte. Vérifie les informations.");
-      }
-    }
-  }
+  const [pending, setPending] = useState(false);
 
   async function handleLogin() {
     try {
+      setPending(true);
       setErrorMessage("");
       const result = await apiFetch<AuthResponse>("/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password })
       });
       localStorage.setItem("qrder_token", result.token);
-      setMessage(`Connecte: ${result.restaurant.name}`);
+      setMessage(`Connecté : ${result.restaurant.name}`);
       router.push("/dashboard");
     } catch (error) {
       const text = error instanceof Error ? error.message : "";
@@ -55,72 +37,86 @@ export default function AuthPage() {
       } else {
         setErrorMessage("Connexion impossible pour le moment. Réessaie dans un instant.");
       }
+    } finally {
+      setPending(false);
     }
   }
 
   return (
-    <main className="container stack">
-      <section className="hero">
-        <span className="badge">Onboarding</span>
-        <h1 className="hero-title">Inscription / connexion</h1>
-        <p className="hero-subtitle">Crée ton espace restaurant puis connecte-toi en quelques secondes.</p>
-      </section>
+    <main className="container auth-page">
+      <Link href="/" className="auth-back">
+        ← Accueil
+      </Link>
 
-      <section className="panel">
-        <div className="row" style={{ marginBottom: 8 }}>
-          <button
-            className={mode === "login" ? "" : "btn-secondary"}
-            onClick={() => {
-              setMode("login");
-              setErrorMessage("");
-              setMessage("");
-            }}
-          >
-            Connexion
-          </button>
-          <button
-            className={mode === "register" ? "" : "btn-secondary"}
-            onClick={() => {
-              setMode("register");
-              setErrorMessage("");
-              setMessage("");
-            }}
-          >
-            Inscription
-          </button>
-        </div>
+      <section className="panel auth-card">
+        <header className="auth-card-header">
+          <span className="badge">Espace équipe</span>
+          <h1 className="auth-card-title">Connexion</h1>
+          <p className="auth-card-lead">
+            Les comptes sont fournis par l&apos;administrateur de ton établissement. Saisis l&apos;email et le mot de passe
+            qui t&apos;ont été communiqués.
+          </p>
+        </header>
 
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Identifiant (email)"
-        />
-        <div style={{ height: 8 }} />
-        <input
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Mdp"
-          type="password"
-        />
-        {mode === "register" && (
-          <>
-            <div style={{ height: 8 }} />
-            <input
-              value={restaurantName}
-              onChange={(e) => setRestaurantName(e.target.value)}
-              placeholder="Nom du restaurant"
-            />
-          </>
-        )}
-        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          {mode === "register" ? (
-            <button onClick={handleRegister}>Créer le compte</button>
-          ) : (
-            <button onClick={handleLogin}>Se connecter</button>
-          )}
-        </div>
-        {errorMessage && <p className="muted form-error">{errorMessage}</p>}
-        {message && <p className="muted">{message}</p>}
+        <form
+          className="auth-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (pending) return;
+            void handleLogin();
+          }}
+        >
+          <div className="auth-form-fields">
+            <label className="form-field">
+              <span className="form-label">Email</span>
+              <input
+                type="email"
+                name="email"
+                autoComplete="username"
+                inputMode="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="contact@restaurant.fr"
+                required
+                disabled={pending}
+              />
+            </label>
+
+            <label className="form-field">
+              <span className="form-label">Mot de passe</span>
+              <input
+                type="password"
+                name="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                minLength={1}
+                disabled={pending}
+              />
+            </label>
+          </div>
+
+          {errorMessage ? (
+            <p className="auth-alert auth-alert-error" role="alert">
+              {errorMessage}
+            </p>
+          ) : null}
+          {message ? (
+            <p className="auth-alert auth-alert-success" role="status">
+              {message}
+            </p>
+          ) : null}
+
+          <button type="submit" className="btn-primary-ios auth-submit" disabled={pending}>
+            {pending ? "Patience…" : "Se connecter"}
+          </button>
+        </form>
+
+        <p className="auth-footer-note">
+          Besoin d&apos;un accès ? Contacte le gérant du restaurant ou l&apos;administrateur Qrder.
+        </p>
       </section>
     </main>
   );
