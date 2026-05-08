@@ -14,6 +14,14 @@ type HistoryOrder = {
   items: { id: string; nameSnapshot: string; quantity: number; lineTotalCents: number }[];
 };
 
+const STATUS_FR: Record<HistoryOrder["status"], string> = {
+  PLACED: "En attente",
+  PREPARING: "En préparation",
+  READY: "Prêt",
+  SERVED: "Servi",
+  CANCELLED: "Annulé"
+};
+
 export default function HistoryPage() {
   return (
     <main className="container stack">
@@ -62,37 +70,48 @@ function HistoryList({ token }: { token: string }) {
             style={{ maxWidth: 220 }}
           >
             <option value="">Tous les statuts</option>
-            <option value="PLACED">PLACED</option>
-            <option value="PREPARING">PREPARING</option>
-            <option value="READY">READY</option>
-            <option value="SERVED">SERVED</option>
-            <option value="CANCELLED">CANCELLED</option>
+            <option value="PLACED">{STATUS_FR.PLACED}</option>
+            <option value="PREPARING">{STATUS_FR.PREPARING}</option>
+            <option value="READY">{STATUS_FR.READY}</option>
+            <option value="SERVED">{STATUS_FR.SERVED}</option>
+            <option value="CANCELLED">{STATUS_FR.CANCELLED}</option>
           </select>
           <button className="btn-secondary" onClick={() => load()}>
             Rafraîchir
           </button>
         </div>
-        <span className="pill">CA affiché: {(totalRevenue / 100).toFixed(2)} EUR</span>
+        <span className="pill">CA : {(totalRevenue / 100).toFixed(2)} €</span>
       </div>
 
-      {orders.map((order) => (
-        <div key={order.id} className="panel">
-          <div className="row-between">
-            <h3 className="panel-title">
-              #{order.orderNumber} - Table {order.table.name}
-            </h3>
-            <span className={`status ${statusClass(order.status)}`}>{order.status}</span>
-          </div>
-          <p className="muted">
-            {new Date(order.createdAt).toLocaleString("fr-FR")} - Total {(order.totalCents / 100).toFixed(2)} EUR
-          </p>
-          {order.items.map((item) => (
-            <p key={item.id} className="muted">
-              {item.quantity}x {item.nameSnapshot} - {(item.lineTotalCents / 100).toFixed(2)} EUR
-            </p>
+      {orders.length > 0 && (
+        <div className="history-orders">
+          {orders.map((order) => (
+            <article key={order.id} className="panel history-order-card">
+              <div className="history-order-head row-between">
+                <h3 className="panel-title history-order-title">
+                  #{order.orderNumber} — Table {order.table.name}
+                </h3>
+                <span className={`status ${statusClass(order.status)}`}>{STATUS_FR[order.status]}</span>
+              </div>
+              <p className="muted history-order-meta">
+                {new Date(order.createdAt).toLocaleString("fr-FR")} — Total {(order.totalCents / 100).toFixed(2)} €
+              </p>
+              {order.items.length > 0 ? (
+                <ul className="history-order-lines">
+                  {order.items.map((item) => (
+                    <li key={item.id} className="muted history-order-line">
+                      <span>
+                        {item.quantity}× {item.nameSnapshot}
+                      </span>
+                      <span className="tabular-nums">{(item.lineTotalCents / 100).toFixed(2)} €</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </article>
           ))}
         </div>
-      ))}
+      )}
 
       {orders.length === 0 && <div className="panel muted">Aucune commande trouvée pour ce filtre.</div>}
     </div>
@@ -103,5 +122,6 @@ function statusClass(status: HistoryOrder["status"]) {
   if (status === "PLACED") return "status-placed";
   if (status === "PREPARING") return "status-preparing";
   if (status === "READY") return "status-ready";
+  if (status === "CANCELLED") return "status-cancelled";
   return "status-served";
 }

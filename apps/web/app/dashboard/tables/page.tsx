@@ -84,8 +84,19 @@ function TablesManager({ token }: { token: string }) {
             <div className="table-card-header">
               <div className="table-card-title">
                 <span className="table-card-icon" aria-hidden="true">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/table.png" alt="" />
+                  <svg
+                    className="table-card-icon-svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.65"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M4 8h16v2.5H4z" />
+                    <path d="M7 10.5V18M12 10.5V18M17 10.5V18" />
+                    <path d="M7 18v2M17 18v2" />
+                  </svg>
                 </span>
                 <span className="table-card-name">{table.name}</span>
               </div>
@@ -102,7 +113,12 @@ function TablesManager({ token }: { token: string }) {
                     )
                   }
                 >
-                  <span aria-hidden="true">🔗</span>
+                  <svg className="table-action-svg" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M6.25 4.75h5.5a.75.75 0 010 1.5H8.56l10.47 10.47a.75.75 0 11-1.06 1.06L7.5 7.31v3.19a.75.75 0 01-1.5 0v-5.5a.75.75 0 01.75-.75zm12 3a.75.75 0 01.75.75v11a.75.75 0 01-.75.75h-11a.75.75 0 01-.75-.75v-4a.75.75 0 011.5 0v3.25h9.5v-9.5H16a.75.75 0 010-1.5h2.25z"
+                    />
+                  </svg>
                   Ouvrir l&apos;interface client
                 </button>
               )}
@@ -110,7 +126,12 @@ function TablesManager({ token }: { token: string }) {
                 className="table-action"
                 onClick={() => downloadQr(table.id, table.name, token)}
               >
-                <span aria-hidden="true">⬇</span>
+                <svg className="table-action-svg" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M12 2.25a.75.75 0 01.75.75v10.19l2.22-2.22a.75.75 0 111.06 1.06l-3.5 3.5a.75.75 0 01-1.06 0l-3.5-3.5a.75.75 0 111.06-1.06l2.22 2.22V3a.75.75 0 01.75-.75zm-6.25 14a.75.75 0 00-.75.75v2.5c0 .69.56 1.25 1.25 1.25h11.5c.69 0 1.25-.56 1.25-1.25v-2.5a.75.75 0 011.5 0v2.5A2.75 2.75 0 0118.5 22h-11A2.75 2.75 0 014.75 19.25v-2.5a.75.75 0 01.75-.75z"
+                  />
+                </svg>
                 Télécharger le QR
               </button>
             </div>

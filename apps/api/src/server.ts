@@ -472,7 +472,7 @@ app.get("/public/orders/:id/status", async (req, res) => {
 
 app.get("/kitchen/orders", authRequired, async (req, res) => {
   const includeRecentServed = req.query.includeRecentServed === "true";
-  const recentMinutes = Number(req.query.recentMinutes) || 60;
+  const recentMinutes = Number(req.query.recentMinutes) || 30;
 
   const activeStatuses: OrderStatus[] = [
     OrderStatus.PLACED,
@@ -501,13 +501,14 @@ app.get("/kitchen/orders", authRequired, async (req, res) => {
     where: {
       restaurantId: req.user!.restaurantId,
       status: OrderStatus.SERVED,
-      createdAt: { gte: since }
+      /* Fenêtre basée sur la dernière maj (ex. passage en Servi), pas sur la création de la commande */
+      updatedAt: { gte: since }
     },
     include: {
       table: true,
       items: { include: { options: true } }
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { updatedAt: "desc" },
     take: 12
   });
 
@@ -551,6 +552,115 @@ app.get("/orders/history", authRequired, async (req, res) => {
   });
 
   res.json(orders);
+});
+
+/** Agrégats pour la vue « Pilotage » (CA, volumes, répartition) — plage en ISO côté client (fuseau du navigateur). */
+app.get("/dashboard/analytics", authRequired, async (req, res) => {
+  const fromRaw = typeof req.query.from === "string" ? req.query.from : undefined;
+  const toRaw = typeof req.query.to === "string" ? req.query.to : undefined;
+  if (!fromRaw || !toRaw) {
+    return res.status(400).json({ message: "Query params `from` and `to` (ISO 8601) are required" });
+  }
+  const from = new Date(fromRaw);
+  const to = new Date(toRaw);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) {
+    return res.status(400).json({ message: "Invalid date range" });
+  }
+
+  const rid = req.user!.restaurantId;
+  const dateWhere = { gte: from, lte: to };
+  const baseWhere = { restaurantId: rid, createdAt: dateWhere };
+  const commerceWhere = { ...baseWhere, status: { not: OrderStatus.CANCELLED } };
+  const orderItemCommerceFilter = {
+    order: {
+      restaurantId: rid,
+      createdAt: dateWhere,
+      status: { not: OrderStatus.CANCELLED }
+    }
+  };
+
+  /* Tables où il y a eu une commande non annulée créée OU mise à jour sur la période (sinon une seule table si tu ne fais que valider d'anciennes commandes). */
+  const tablesActivityWhere = {
+    restaurantId: rid,
+    status: { not: OrderStatus.CANCELLED },
+    OR: [{ createdAt: dateWhere }, { updatedAt: dateWhere }]
+  };
+
+  const [orderCount, lineAgg, headerAgg, statusGroups, distinctTableRows, itemRows] = await Promise.all([
+    db.order.count({ where: commerceWhere }),
+    db.orderItem.aggregate({
+      where: orderItemCommerceFilter,
+      _sum: { lineTotalCents: true },
+      _count: { id: true }
+    }),
+    db.order.aggregate({
+      where: commerceWhere,
+      _sum: { totalCents: true }
+    }),
+    db.order.groupBy({
+      by: ["status"],
+      where: baseWhere,
+      _count: { id: true }
+    }),
+    db.order.findMany({
+      where: tablesActivityWhere,
+      select: { tableId: true },
+      distinct: ["tableId"]
+    }),
+    db.orderItem.findMany({
+      where: orderItemCommerceFilter,
+      select: { nameSnapshot: true, quantity: true, lineTotalCents: true }
+    })
+  ]);
+
+  /* CA = somme réelle des lignes article (hors annulées). Totaux commande également renvoyés pour contrôle. */
+  const revenueCents = lineAgg._sum.lineTotalCents ?? 0;
+  const revenueOrderHeaderCents = headerAgg._sum.totalCents ?? 0;
+  const totalsMismatchCents = Math.abs(revenueCents - revenueOrderHeaderCents);
+  const lineItemsCount = lineAgg._count.id;
+
+  const distinctTablesWithOrders = distinctTableRows.length;
+
+  const byName = new Map<string, { qty: number; revenueCents: number }>();
+  for (const row of itemRows) {
+    const cur = byName.get(row.nameSnapshot) ?? { qty: 0, revenueCents: 0 };
+    cur.qty += row.quantity;
+    cur.revenueCents += row.lineTotalCents;
+    byName.set(row.nameSnapshot, cur);
+  }
+  const topItems = [...byName.entries()]
+    .map(([name, v]) => ({ name, quantitySold: v.qty, revenueCents: v.revenueCents }))
+    .sort((a, b) => b.revenueCents - a.revenueCents)
+    .slice(0, 5);
+
+  let nonCancelledCount = 0;
+  let servedCount = 0;
+  let cancelledCount = 0;
+  for (const g of statusGroups) {
+    if (g.status === OrderStatus.CANCELLED) cancelledCount = g._count.id;
+    else nonCancelledCount += g._count.id;
+    if (g.status === OrderStatus.SERVED) servedCount = g._count.id;
+  }
+  const servedRate =
+    nonCancelledCount > 0 ? Math.round((1000 * servedCount) / nonCancelledCount) / 1000 : null;
+
+  res.json({
+    from: from.toISOString(),
+    to: to.toISOString(),
+    computedAt: new Date().toISOString(),
+    revenueCents,
+    revenueOrderHeaderCents,
+    totalsMismatchCents,
+    lineItemsCount,
+    orderCount,
+    averageBasketCents: orderCount > 0 ? Math.round(revenueCents / orderCount) : 0,
+    distinctTablesWithOrders,
+    cancelledOrders: cancelledCount,
+    servedOrders: servedCount,
+    servedRate,
+    byStatus: statusGroups.map((g) => ({ status: g.status, count: g._count.id })),
+    topItems
+  });
 });
 
 app.patch("/kitchen/orders/:id/status", authRequired, async (req, res) => {

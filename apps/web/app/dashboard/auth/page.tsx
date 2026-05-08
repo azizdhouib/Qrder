@@ -119,11 +119,7 @@ export default function AuthPage() {
             <button onClick={handleLogin}>Se connecter</button>
           )}
         </div>
-        {errorMessage && (
-          <p className="muted" style={{ color: "#8E2A23" }}>
-            {errorMessage}
-          </p>
-        )}
+        {errorMessage && <p className="muted form-error">{errorMessage}</p>}
         {message && <p className="muted">{message}</p>}
       </section>
     </main>

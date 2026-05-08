@@ -12,6 +12,8 @@ type KitchenOrder = {
   orderNumber: number;
   status: OrderStatus;
   createdAt: string;
+  /** Dernière maj (ex. passage en Servi) — pour tri et fenêtre 30 min côté API */
+  updatedAt?: string;
   table: { name: string };
   items: { id: string; nameSnapshot: string; quantity: number }[];
 };
@@ -32,21 +34,48 @@ const BACKWARD: Record<OrderStatus, OrderStatus | null> = {
   CANCELLED: null
 };
 
-const FORWARD_LABEL: Record<OrderStatus, string> = {
-  PLACED: "Demarrer",
-  PREPARING: "Pret",
-  READY: "Servi",
-  SERVED: "",
-  CANCELLED: ""
-};
+/** Colonnes du tableau (ordre affiché = flux cuisine, façon Jira). */
+const KITCHEN_COLUMNS: { status: OrderStatus; title: string }[] = [
+  { status: "PLACED", title: "En attente" },
+  { status: "PREPARING", title: "En preparation" },
+  { status: "READY", title: "Pret" },
+  { status: "SERVED", title: "Servi" }
+];
+
+/** Doit correspondre au paramètre recentMinutes de l’API cuisine (fenêtre colonne Servi). */
+const KITCHEN_SERVED_VISIBLE_MINUTES = 30;
+
+const KITCHEN_DISMISSED_SERVED_KEY = "qrder_kitchen_dismissed_served";
+
+function readDismissedServedIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = sessionStorage.getItem(KITCHEN_DISMISSED_SERVED_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw) as unknown;
+    return new Set(Array.isArray(arr) ? arr.filter((x): x is string => typeof x === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistDismissedServedIds(ids: Set<string>) {
+  try {
+    sessionStorage.setItem(KITCHEN_DISMISSED_SERVED_KEY, JSON.stringify([...ids]));
+  } catch {
+    /* ignore */
+  }
+}
 
 export default function KitchenPage() {
   return (
     <main className="container stack kitchen-focus">
       <section className="hero">
-        <span className="badge">Kitchen Live</span>
-        <h1 className="hero-title">Interface cuisine temps reel</h1>
-        <p className="hero-subtitle">Suis et traite les commandes immediatement apres le scan client.</p>
+        <span className="badge">Cuisine</span>
+        <h1 className="hero-title">Commandes en direct</h1>
+        <p className="hero-subtitle">
+          Fais avancer chaque commande d&apos;une étape à l&apos;autre selon où elle en est.
+        </p>
       </section>
       <TokenGate>{(token) => <KitchenScreen token={token} />}</TokenGate>
     </main>
@@ -56,10 +85,21 @@ export default function KitchenPage() {
 function KitchenScreen({ token }: { token: string }) {
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [restaurantId, setRestaurantId] = useState<string>("");
+  const [dismissedServedIds, setDismissedServedIds] = useState<Set<string>>(() => new Set());
+
+  function dismissServedFromBoard(orderId: string) {
+    setDismissedServedIds((prev) => {
+      if (prev.has(orderId)) return prev;
+      const next = new Set(prev);
+      next.add(orderId);
+      persistDismissedServedIds(next);
+      return next;
+    });
+  }
 
   async function load() {
     const data = await apiFetch<KitchenOrder[]>(
-      "/kitchen/orders?includeRecentServed=true&recentMinutes=60",
+      `/kitchen/orders?includeRecentServed=true&recentMinutes=${KITCHEN_SERVED_VISIBLE_MINUTES}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     setOrders(data);
@@ -70,6 +110,7 @@ function KitchenScreen({ token }: { token: string }) {
     apiFetch<{ id: string }>("/me/restaurant", { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => setRestaurantId(r.id))
       .catch(console.error);
+    setDismissedServedIds(readDismissedServedIds());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -83,11 +124,14 @@ function KitchenScreen({ token }: { token: string }) {
         return [...prev, order];
       });
     });
-    socket.on("order.updated", (order: KitchenOrder) => {
+    socket.on("order.updated", (payload: Partial<KitchenOrder> & { id: string }) => {
       setOrders((prev) => {
-        const exists = prev.some((o) => o.id === order.id);
-        if (exists) return prev.map((o) => (o.id === order.id ? order : o));
-        return [...prev, order];
+        const existing = prev.find((o) => o.id === payload.id);
+        const merged = mergeKitchenOrderFromSocket(existing, payload);
+        if (!merged) return prev;
+        const exists = prev.some((o) => o.id === merged.id);
+        if (exists) return prev.map((o) => (o.id === merged.id ? merged : o));
+        return [...prev, merged];
       });
     });
     return () => {
@@ -95,132 +139,282 @@ function KitchenScreen({ token }: { token: string }) {
     };
   }, [restaurantId]);
 
-  const { active, served } = useMemo(() => {
-    const a = orders.filter((o) => o.status !== "SERVED" && o.status !== "CANCELLED");
-    const s = orders
-      .filter((o) => o.status === "SERVED")
-      .sort((x, y) => (x.createdAt < y.createdAt ? 1 : -1));
-    return { active: a, served: s };
+  useEffect(() => {
+    setDismissedServedIds((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const id of prev) {
+        const o = orders.find((x) => x.id === id);
+        if (!o || o.status !== "SERVED") {
+          next.delete(id);
+          changed = true;
+        }
+      }
+      if (changed) persistDismissedServedIds(next);
+      return changed ? next : prev;
+    });
   }, [orders]);
 
+  const ordersByStatus = useMemo(() => {
+    const map: Record<OrderStatus, KitchenOrder[]> = {
+      PLACED: [],
+      PREPARING: [],
+      READY: [],
+      SERVED: [],
+      CANCELLED: []
+    };
+    for (const o of orders) {
+      if (o.status === "CANCELLED") continue;
+      if (o.status === "SERVED" && dismissedServedIds.has(o.id)) continue;
+      map[o.status].push(o);
+    }
+    const t = (s: string) => new Date(s).getTime();
+    (Object.keys(map) as OrderStatus[]).forEach((key) => {
+      if (key === "SERVED") {
+        map[key].sort((a, b) => {
+          const ta = a.updatedAt ? t(a.updatedAt) : t(a.createdAt);
+          const tb = b.updatedAt ? t(b.updatedAt) : t(b.createdAt);
+          return tb - ta;
+        });
+        return;
+      }
+      map[key].sort((a, b) => t(a.createdAt) - t(b.createdAt));
+    });
+    return map;
+  }, [orders, dismissedServedIds]);
+
+  const liveCount = useMemo(
+    () =>
+      ordersByStatus.PLACED.length +
+      ordersByStatus.PREPARING.length +
+      ordersByStatus.READY.length +
+      ordersByStatus.SERVED.length,
+    [ordersByStatus]
+  );
+
   async function update(orderId: string, status: OrderStatus) {
-    await apiFetch(`/kitchen/orders/${orderId}/status`, {
+    const updated = await apiFetch<KitchenOrder>(`/kitchen/orders/${orderId}/status`, {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify({ status })
+    });
+    setOrders((prev) => {
+      const idx = prev.findIndex((o) => o.id === orderId);
+      if (idx === -1) return [...prev, updated];
+      return prev.map((o) => (o.id === orderId ? updated : o));
     });
   }
 
   return (
     <div className="stack">
       <section>
-        <div className="row-between" style={{ marginBottom: 10 }}>
+        <div className="row-between" style={{ marginBottom: 12 }}>
           <h2 className="section-title" style={{ margin: 0 }}>
-            En cours ({active.length})
+            Commandes ({liveCount})
           </h2>
         </div>
-        {active.length === 0 ? (
-          <div className="panel">
-            <p className="muted">Aucune commande en cours.</p>
-          </div>
-        ) : (
-          <div className="grid grid-2 kitchen-grid">
-            {active.map((order) => {
-              const next = FORWARD[order.status];
-              const prev = BACKWARD[order.status];
-              return (
-                <div key={order.id} className="panel kitchen-order-card">
-                  <div className="row-between">
-                    <h3 className="panel-title kitchen-order-title">
-                      #{order.orderNumber} - Table {order.table.name}
-                    </h3>
-                    <span className={`status kitchen-order-status ${statusClass(order.status)}`}>
-                      {labelOf(order.status)}
-                    </span>
-                  </div>
-                  <div className="kitchen-order-items">
-                    {order.items.map((item) => (
-                      <p key={item.id} className="muted">
-                        {item.quantity}x {item.nameSnapshot}
-                      </p>
-                    ))}
-                  </div>
-                  <div className="kitchen-order-actions">
-                    <button
-                      className="btn-secondary"
-                      disabled={!prev}
-                      onClick={() => prev && update(order.id, prev)}
-                      title={prev ? `Revenir a ${labelOf(prev)}` : "Premiere etape"}
-                    >
-                      ← Reculer
-                    </button>
-                    {next && (
-                      <button onClick={() => update(order.id, next)}>
-                        {FORWARD_LABEL[order.status]} →
-                      </button>
-                    )}
-                    {order.status !== "PLACED" && next === "SERVED" && (
-                      <button className="btn-danger" onClick={() => update(order.id, "SERVED")}>
-                        Servi
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {served.length > 0 && (
-        <section>
-          <div className="row-between" style={{ marginBottom: 10 }}>
-            <h2 className="section-title" style={{ margin: 0 }}>
-              Servies recemment ({served.length})
-            </h2>
-            <span className="muted" style={{ fontSize: "0.82rem" }}>
-              Tu peux annuler une erreur et renvoyer en cuisine
-            </span>
-          </div>
-          <div className="grid grid-2 kitchen-grid">
-            {served.map((order) => (
-              <div key={order.id} className="panel kitchen-order-card kitchen-order-served">
-                <div className="row-between">
-                  <h3 className="panel-title kitchen-order-title">
-                    #{order.orderNumber} - Table {order.table.name}
+        <div className="kitchen-board" role="region" aria-label="Tableau des commandes par etape">
+          {KITCHEN_COLUMNS.map((col) => {
+            const columnOrders = ordersByStatus[col.status];
+            return (
+              <div key={col.status} className="kitchen-board-column">
+                <header className="kitchen-board-column-header">
+                  <h3
+                    className="kitchen-board-column-title"
+                    aria-label={`${col.title}, ${columnOrders.length} commande${columnOrders.length !== 1 ? "s" : ""}`}
+                  >
+                    <span className="kitchen-board-stage-name">{col.title}</span>
+                    <span className="kitchen-board-count kitchen-board-count--inline">{columnOrders.length}</span>
                   </h3>
-                  <span className="status status-served">Servi</span>
-                </div>
-                <div className="kitchen-order-items">
-                  {order.items.map((item) => (
-                    <p key={item.id} className="muted">
-                      {item.quantity}x {item.nameSnapshot}
-                    </p>
-                  ))}
-                </div>
-                <div className="row" style={{ gap: 6 }}>
-                  <button
-                    className="btn-secondary"
-                    onClick={() => update(order.id, "READY")}
-                    title="Annuler le servi - retour a Pret"
-                  >
-                    ↶ Annuler le servi
-                  </button>
-                  <button
-                    className="btn-secondary"
-                    onClick={() => update(order.id, "PREPARING")}
-                    title="Renvoyer en cuisine"
-                  >
-                    Renvoyer en cuisine
-                  </button>
+                </header>
+                <div className={`kitchen-board-column-body kitchen-board-column-body--${col.status.toLowerCase()}`}>
+                  {columnOrders.length === 0 ? (
+                    <p className="kitchen-board-empty muted">Aucune commande</p>
+                  ) : (
+                    columnOrders.map((order) => (
+                      <KitchenOrderKanbanCard
+                        key={order.id}
+                        order={order}
+                        onMove={update}
+                        onDismissFromBoard={dismissServedFromBoard}
+                      />
+                    ))
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
-        </section>
-      )}
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
+}
+
+function KitchenOrderKanbanCard({
+  order,
+  onMove,
+  onDismissFromBoard
+}: {
+  order: KitchenOrder;
+  onMove: (orderId: string, status: OrderStatus) => void;
+  onDismissFromBoard: (orderId: string) => void;
+}) {
+  const next = FORWARD[order.status];
+  const prev = BACKWARD[order.status];
+  return (
+    <article className={`panel kitchen-order-card kitchen-order-card--kanban${order.status === "SERVED" ? " kitchen-order-served" : ""}`}>
+      <div className="kitchen-order-card-head">
+        <h3 className="panel-title kitchen-order-title">
+          #{order.orderNumber} — Table {order.table.name}
+        </h3>
+        <span className={`status kitchen-order-status ${statusClass(order.status)}`}>{labelOf(order.status)}</span>
+      </div>
+      <div className="kitchen-order-items">
+        {order.items.map((item) => (
+          <p key={item.id} className="muted">
+            {item.quantity}x {item.nameSnapshot}
+          </p>
+        ))}
+      </div>
+      {order.status === "SERVED" && (
+        <ServedAutoRemoveTimer
+          updatedAt={order.updatedAt}
+          createdAt={order.createdAt}
+          windowMinutes={KITCHEN_SERVED_VISIBLE_MINUTES}
+        />
+      )}
+      <div
+        className={`kitchen-order-actions kitchen-order-actions--kanban${
+          order.status === "SERVED" ? " kitchen-order-actions--served" : ""
+        }`}
+      >
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={!prev}
+          onClick={() => prev && onMove(order.id, prev)}
+          title={
+            order.status === "SERVED"
+              ? "Annuler le servi : retour a Pret"
+              : prev
+                ? `Etape precedente : ${labelOf(prev)}`
+                : "Deja en premiere etape"
+          }
+          aria-label={prev ? `Reculer vers ${labelOf(prev)}` : "Impossible de reculer"}
+        >
+          <span aria-hidden="true">←</span>
+        </button>
+        <button
+          type="button"
+          disabled={!next}
+          onClick={() => next && onMove(order.id, next)}
+          title={next ? `Etape suivante : ${labelOf(next)}` : "Derniere etape"}
+          aria-label={next ? `Avancer vers ${labelOf(next)}` : "Impossible d'avancer"}
+        >
+          <span aria-hidden="true">→</span>
+        </button>
+        {order.status === "SERVED" && (
+          <>
+            <button
+              type="button"
+              className="btn-secondary kitchen-served-renvoyer"
+              onClick={() => onMove(order.id, "PREPARING")}
+              title="Erreur de servi : remettre la commande en preparation"
+              aria-label="Renvoyer en cuisine"
+            >
+              Renvoyer en cuisine
+            </button>
+            <button
+              type="button"
+              className="btn-secondary kitchen-served-dismiss"
+              onClick={() => onDismissFromBoard(order.id)}
+              title="Retire la commande de cet écran. Elle reste consultable dans l'historique."
+              aria-label="Retirer du tableau"
+            >
+              Retirer du tableau
+            </button>
+          </>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function formatServedRemaining(ms: number): string {
+  if (ms <= 0) return "0:00";
+  const totalSec = Math.ceil(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function ServedAutoRemoveTimer({
+  updatedAt,
+  createdAt,
+  windowMinutes
+}: {
+  updatedAt?: string;
+  createdAt: string;
+  windowMinutes: number;
+}) {
+  const endMs = useMemo(() => {
+    const anchor = updatedAt ?? createdAt;
+    return new Date(anchor).getTime() + windowMinutes * 60 * 1000;
+  }, [updatedAt, createdAt, windowMinutes]);
+
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const remaining = endMs - now;
+  const timeStr = formatServedRemaining(remaining);
+  const urgent = remaining > 0 && remaining <= 60_000;
+  const ariaLabel = servedExpiryAriaLabel(remaining);
+
+  return (
+    <p
+      className={`kitchen-served-expiry muted${urgent ? " kitchen-served-expiry--urgent" : ""}`}
+      role="timer"
+      aria-label={ariaLabel}
+    >
+      <span className="kitchen-served-expiry-label">Disparition auto dans </span>
+      <span className="kitchen-served-expiry-time">{remaining <= 0 ? "0:00" : timeStr}</span>
+    </p>
+  );
+}
+
+function servedExpiryAriaLabel(remaining: number): string {
+  if (remaining <= 0) return "Bientôt retirée de l'écran";
+  const totalSec = Math.ceil(remaining / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  if (m === 0) return `Disparition automatique dans ${s} seconde${s > 1 ? "s" : ""}`;
+  if (s === 0) return `Disparition automatique dans ${m} minute${m > 1 ? "s" : ""}`;
+  return `Disparition automatique dans ${m} minute${m > 1 ? "s" : ""} et ${s} seconde${s > 1 ? "s" : ""}`;
+}
+
+function mergeKitchenOrderFromSocket(
+  existing: KitchenOrder | undefined,
+  payload: Partial<KitchenOrder> & { id: string }
+): KitchenOrder | null {
+  if (!existing) {
+    const complete =
+      payload.orderNumber != null &&
+      payload.status &&
+      payload.createdAt &&
+      payload.table &&
+      Array.isArray(payload.items);
+    return complete ? (payload as KitchenOrder) : null;
+  }
+  return {
+    ...existing,
+    ...payload,
+    table: payload.table ?? existing.table,
+    items: payload.items ?? existing.items,
+    updatedAt: payload.updatedAt ?? existing.updatedAt
+  };
 }
 
 function labelOf(status: OrderStatus): string {

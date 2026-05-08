@@ -1,19 +1,16 @@
 import "./globals.css";
 import type { ReactNode } from "react";
-import { Plus_Jakarta_Sans, Fraunces } from "next/font/google";
+import { Inter } from "next/font/google";
+import Script from "next/script";
+import ThemeToggle from "@/components/ThemeToggle";
 
-const sans = Plus_Jakarta_Sans({
+const inter = Inter({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-sans"
+  variable: "--font-inter"
 });
 
-const display = Fraunces({
-  subsets: ["latin"],
-  display: "swap",
-  axes: ["SOFT"],
-  variable: "--font-display"
-});
+const themeInitScript = `(function(){try{var k="qrder-theme";var s=localStorage.getItem(k);var q=window.matchMedia("(prefers-color-scheme: dark)").matches;var d=document.documentElement;if(s==="dark"||(s!=="light"&&q)){d.setAttribute("data-theme","dark");}else{d.setAttribute("data-theme","light");}}catch(e){}})();`;
 
 export const metadata = {
   title: "Qrder",
@@ -22,8 +19,12 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="fr" className={`${sans.variable} ${display.variable}`}>
-      <body>{children}</body>
+    <html lang="fr" className={inter.variable} suppressHydrationWarning>
+      <body suppressHydrationWarning>
+        <Script id="qrder-theme-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        {children}
+        <ThemeToggle />
+      </body>
     </html>
   );
 }

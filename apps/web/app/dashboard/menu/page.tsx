@@ -179,7 +179,10 @@ function MenuManager({ token }: { token: string }) {
             </p>
           </div>
           <div className="row">
-            <button className="btn-secondary" onClick={() => setShowCreate((v) => !v)}>
+            <button
+              className={showCreate ? "btn-secondary" : "btn-outline-primary"}
+              onClick={() => setShowCreate((v) => !v)}
+            >
               {showCreate ? "Fermer" : "Nouveau produit"}
             </button>
           </div>
@@ -236,11 +239,16 @@ function MenuManager({ token }: { token: string }) {
             </label>
 
             <label className="form-field">
-              <span className="form-label">Prix (en centimes)</span>
+              <span className="form-label">Prix (€)</span>
               <input
                 type="number"
-                value={priceCents}
-                onChange={(e) => setPriceCents(Number(e.target.value))}
+                step="0.01"
+                min="0"
+                value={priceCents / 100}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  setPriceCents(Number.isFinite(v) ? Math.round(v * 100) : 0);
+                }}
               />
             </label>
 
@@ -287,6 +295,7 @@ function MenuManager({ token }: { token: string }) {
               Réinitialiser
             </button>
             <button
+              className="btn-primary-ios"
               onClick={async () => {
                 if (!categoryId || !itemName) return;
                 await apiFetch("/menu/items", {
@@ -328,6 +337,7 @@ function MenuManager({ token }: { token: string }) {
             style={{ flex: 1, minWidth: 220 }}
           />
           <button
+            className="btn-primary-ios"
             onClick={async () => {
               if (!categoryName) return;
               await apiFetch("/menu/categories", {
@@ -419,15 +429,23 @@ function MenuManager({ token }: { token: string }) {
                             />
                           </label>
                           <label className="form-field">
-                            <span className="form-label">Prix (centimes)</span>
+                            <span className="form-label">Prix (€)</span>
                             <input
                               type="number"
-                              value={editDraft.priceCents}
-                              onChange={(e) =>
+                              step="0.01"
+                              min="0"
+                              value={editDraft.priceCents / 100}
+                              onChange={(e) => {
+                                const v = parseFloat(e.target.value);
                                 setEditDraft((prev) =>
-                                  prev ? { ...prev, priceCents: Number(e.target.value) } : prev
-                                )
-                              }
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        priceCents: Number.isFinite(v) ? Math.round(v * 100) : 0
+                                      }
+                                    : prev
+                                );
+                              }}
                             />
                           </label>
                           <label className="form-field">
@@ -475,7 +493,7 @@ function MenuManager({ token }: { token: string }) {
                               </p>
                             </div>
                             <div className="admin-menu-meta">
-                              <strong>{(item.priceCents / 100).toFixed(2)} EUR</strong>
+                              <strong>{(item.priceCents / 100).toFixed(2)} €</strong>
                               <span className={`pill ${item.isActive ? "" : "pill-inactive"}`}>
                                 {item.isActive ? "Actif" : "Inactif"}
                               </span>
@@ -487,7 +505,7 @@ function MenuManager({ token }: { token: string }) {
                               {item.options
                                 .map(
                                   (opt) =>
-                                    `${opt.name} (+${(opt.priceDeltaCents / 100).toFixed(2)} EUR)`
+                                    `${opt.name} (+${(opt.priceDeltaCents / 100).toFixed(2)} €)`
                                 )
                                 .join(", ")}
                             </p>
@@ -499,7 +517,9 @@ function MenuManager({ token }: { token: string }) {
                     <div className="admin-menu-card-footer">
                       {isEditing ? (
                         <>
-                          <button onClick={() => saveEdit(item.id)}>Enregistrer</button>
+                          <button className="btn-primary-ios" onClick={() => saveEdit(item.id)}>
+                            Enregistrer
+                          </button>
                           <button
                             className="btn-secondary"
                             onClick={() => {

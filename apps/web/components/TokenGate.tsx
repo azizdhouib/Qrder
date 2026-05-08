@@ -17,14 +17,19 @@ export function TokenGate({ children }: Props) {
 
   if (!token) {
     return (
-      <div className="panel">
+      <div className="panel token-gate-panel">
         <div className="row-between">
-          <h3 className="panel-title">JWT requis</h3>
-          <span className="pill">Secure access</span>
+          <h3 className="panel-title">Session requise</h3>
+          <span className="label-kicker" style={{ margin: 0 }}>
+            Accès sécurisé
+          </span>
         </div>
-        <p className="muted">Colle ici le token obtenu via /auth/login ou /auth/register.</p>
+        <p className="muted">
+          Colle ici la clé d&apos;accès affichée après connexion ou inscription lorsque le navigateur ne
+          l&apos;a pas enregistrée.
+        </p>
         <input
-          placeholder="Bearer token"
+          placeholder="Clé d'accès"
           onChange={(e) => setToken(e.target.value)}
           value={token}
         />
