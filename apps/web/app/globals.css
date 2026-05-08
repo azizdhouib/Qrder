@@ -94,40 +94,39 @@
 
 [data-theme="dark"] {
   color-scheme: dark;
-  /* Neutres proches du gris système (faible chroma) — moins « bleu nuit », un poil plus profond */
-  --background: oklch(0.125 0.004 285);
-  --foreground: oklch(0.97 0.004 285);
-  --surface: oklch(0.155 0.005 285);
-  --surface-elevated: oklch(0.195 0.006 285);
-  --card: oklch(0.175 0.005 285);
-  --muted: oklch(0.52 0.008 285);
-  --muted-foreground: oklch(0.635 0.01 285);
-  --border: oklch(0.33 0.009 285);
-  /* Accent bleu un peu plus calibré type UI Apple, sans dominer le fond */
-  --primary: oklch(0.69 0.11 258);
-  --primary-foreground: oklch(0.99 0.003 285);
-  --primary-subtle: oklch(0.26 0.045 258);
+  /* Palette type ref. dashboard : zinc profond + bleu #3B82F6 (Tailwind blue-500) */
+  --background: #0b0b0c;
+  --foreground: #ffffff;
+  --surface: #141416;
+  --surface-elevated: #18181b;
+  --card: #101012;
+  --muted: #71717a;
+  --muted-foreground: #a1a1aa;
+  --border: rgb(255 255 255 / 0.1);
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --primary-subtle: rgb(59 130 246 / 0.16);
   --destructive: oklch(0.58 0.2 25);
   --destructive-foreground: oklch(0.99 0.006 260);
-  --secondary: oklch(0.225 0.006 285);
-  --secondary-foreground: oklch(0.935 0.008 285);
+  --secondary: #27272a;
+  --secondary-foreground: #fafafa;
 
   --status-placed-dot: oklch(0.82 0.11 75);
-  --status-preparing-dot: oklch(0.7 0.11 258);
+  --status-preparing-dot: #3b82f6;
   --status-ready-dot: oklch(0.72 0.13 155);
-  --status-neutral-dot: oklch(0.64 0.025 285);
+  --status-neutral-dot: #71717a;
 
-  --shadow-a: 0 1px 2px oklch(0 0 0 / 0.24);
-  --shadow-b: 0 3px 10px oklch(0 0 0 / 0.2);
+  --shadow-a: 0 1px 2px rgb(0 0 0 / 0.45);
+  --shadow-b: 0 3px 12px rgb(0 0 0 / 0.35);
   --shadow: var(--shadow-a), var(--shadow-b);
-  --shadow-hover: 0 1px 2px oklch(0 0 0 / 0.26), 0 6px 18px oklch(0 0 0 / 0.26);
-  --shadow-pop-theme: 0 2px 10px oklch(0 0 0 / 0.24), 0 14px 28px oklch(0 0 0 / 0.3);
+  --shadow-hover: 0 1px 2px rgb(0 0 0 / 0.5), 0 8px 24px rgb(0 0 0 / 0.4);
+  --shadow-pop-theme: 0 2px 12px rgb(0 0 0 / 0.4), 0 16px 32px rgb(0 0 0 / 0.45);
 
-  --glass-bg: oklch(0.2 0.006 285 / 0.78);
-  --hairline: oklch(1 0 0 / 0.09);
-  --overlay-backdrop: oklch(0.055 0.006 285 / 0.68);
+  --glass-bg: rgb(15 15 17 / 0.82);
+  --hairline: rgb(255 255 255 / 0.1);
+  --overlay-backdrop: rgb(0 0 0 / 0.72);
 
-  --line-strong: oklch(0.43 0.01 285);
+  --line-strong: rgb(255 255 255 / 0.18);
 }
 
 html,
@@ -165,20 +164,20 @@ body {
     linear-gradient(180deg, var(--background) 0%, var(--surface) 100%);
 }
 
-/* Fond : halo quasi neutre en sombre pour éviter la domination bleue du primary */
+/* Fond sombre : halo très discret, aligné zinc + accent bleu type ref. */
 html[data-theme="dark"] body {
   background-image:
     radial-gradient(
       ellipse 125% 85% at 50% -28%,
-      color-mix(in oklch, var(--foreground), transparent 97%),
+      rgb(255 255 255 / 0.04),
       transparent 58%
     ),
     radial-gradient(
       ellipse 85% 52% at 100% 0%,
-      color-mix(in oklch, var(--primary), transparent 97%),
+      rgb(59 130 246 / 0.06),
       transparent 48%
     ),
-    linear-gradient(180deg, var(--background) 0%, var(--surface) 100%);
+    linear-gradient(180deg, var(--background) 0%, #0e0e10 100%);
 }
 
 h1,
@@ -1799,6 +1798,11 @@ textarea:focus {
   opacity: 1;
 }
 
+html[data-theme="dark"] .menu-tab:hover {
+  background: color-mix(in srgb, var(--foreground) 9%, var(--secondary));
+  opacity: 1;
+}
+
 .menu-tab-active {
   background: var(--card);
   color: var(--foreground);
@@ -2288,14 +2292,14 @@ html {
 }
 
 .landing-marketing {
-  --landing-bg: oklch(0.055 0.003 285);
-  --landing-surface: oklch(0.11 0.004 285);
-  --landing-elevated: oklch(0.14 0.005 285);
-  --landing-fg: oklch(0.98 0.004 285);
-  --landing-muted: oklch(0.6 0.018 285);
-  --landing-accent: oklch(0.68 0.14 258);
-  --landing-border: oklch(1 0 0 / 0.1);
-  --landing-btn-pill-fg: oklch(0.055 0.003 285);
+  --landing-bg: #0b0b0c;
+  --landing-surface: #141416;
+  --landing-elevated: #18181b;
+  --landing-fg: #ffffff;
+  --landing-muted: #a1a1aa;
+  --landing-accent: #3b82f6;
+  --landing-border: rgb(255 255 255 / 0.1);
+  --landing-btn-pill-fg: #0b0b0c;
 
   min-height: 100vh;
   background: var(--landing-bg);
