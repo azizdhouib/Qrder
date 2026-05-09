@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties } from "react";
 import {
   Clock,
   QrCode,
@@ -45,14 +44,17 @@ export default function LandingMarketing() {
   const scrollRaf = useRef<number>(0);
   const [navDense, setNavDense] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
-  const [heroScroll, setHeroScroll] = useState(0);
 
   const onScroll = useCallback(() => {
     if (scrollRaf.current) cancelAnimationFrame(scrollRaf.current);
     scrollRaf.current = requestAnimationFrame(() => {
       const vh = window.innerHeight;
+      const y = window.scrollY;
 
-      setNavDense(window.scrollY > 24);
+      setNavDense((prev) => {
+        const next = y > 24;
+        return prev === next ? prev : next;
+      });
 
       const hero = heroRef.current;
       let hp = 0;
@@ -60,7 +62,8 @@ export default function LandingMarketing() {
         const bottom = hero.getBoundingClientRect().bottom;
         hp = Math.max(0, Math.min(1, 1 - bottom / (vh * 0.92)));
       }
-      setHeroScroll(reduceMotion ? 0 : hp);
+      if (reduceMotion) hp = 0;
+      hero?.style.setProperty("--hero-scroll", String(hp));
     });
   }, [reduceMotion]);
 
@@ -105,7 +108,6 @@ export default function LandingMarketing() {
         className="landing-cine-hero"
         aria-labelledby="landing-hero-heading"
         id="offre"
-        style={{ "--hero-scroll": String(heroScroll) } as CSSProperties}
       >
         <div className="landing-cine-hero-bg" aria-hidden="true" />
         <div className="landing-cine-hero-vignette" aria-hidden="true" />

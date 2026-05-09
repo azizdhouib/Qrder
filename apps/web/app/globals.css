@@ -5635,28 +5635,36 @@ html {
 }
 
 .landing-marketing {
-  --landing-bg: #000000;
-  --landing-surface: #111111;
-  --landing-elevated: #141414;
-  --landing-fg: #fafafa;
-  --landing-muted: #a3a3a3;
-  --landing-accent: #e5e5e5;
-  --landing-border: rgb(255 255 255 / 0.12);
+  /* Proche du pilotage dashboard : charbon profond + halo froid en haut à droite */
+  --landing-bg: #050505;
+  --landing-surface: #121212;
+  --landing-elevated: #151518;
+  --landing-fg: #ffffff;
+  --landing-muted: #9ca3af;
+  --landing-accent: #e8e8e8;
+  --landing-border: rgb(255 255 255 / 0.08);
   --landing-btn-pill-fg: #0a0a0a;
-  /* Bloc « Pourquoi Qrder » : même famille que le hero (pas de bandeau blanc en dark) */
-  --landing-values-bg: #080809;
-  --landing-values-bg-glow: rgb(255 255 255 / 0.045);
+  /* Bloc « Pourquoi Qrder » */
+  --landing-values-bg: #0a0a0c;
+  --landing-values-bg-glow: rgb(255 255 255 / 0.04);
   --landing-values-border: rgb(255 255 255 / 0.07);
   --landing-values-fg: #f5f5f5;
   --landing-values-muted: #9ca3af;
   --landing-values-icon: #f0f0f0;
-  --landing-values-card-bg: rgb(255 255 255 / 0.04);
+  --landing-values-card-bg: rgb(255 255 255 / 0.045);
   --landing-values-card-border: rgb(255 255 255 / 0.07);
 
   min-height: 100vh;
-  background: var(--landing-bg);
   color: var(--landing-fg);
   font-family: inherit;
+  background-color: #040405;
+  background-image:
+    radial-gradient(ellipse 115% 95% at 100% -8%, oklch(0.42 0.13 285 / 0.26), transparent 52%),
+    radial-gradient(ellipse 90% 70% at 0% -5%, oklch(0.22 0.05 255 / 0.16), transparent 48%),
+    radial-gradient(ellipse 100% 55% at 50% -25%, oklch(0.28 0.03 260 / 0.22), transparent 58%),
+    linear-gradient(168deg, #0a0a0e 0%, #060607 40%, #030304 100%);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
 }
 
 /* Thème clair : la landing suit le toggle (contraste lisible + logo foncé) */
@@ -5677,6 +5685,18 @@ html[data-theme="light"] .landing-marketing {
   --landing-values-icon: #0a0a0a;
   --landing-values-card-bg: #ffffff;
   --landing-values-card-border: rgb(0 0 0 / 0.06);
+
+  background-color: var(--landing-bg);
+  background-image:
+    radial-gradient(ellipse 95% 70% at 50% -12%, rgb(0 0 0 / 0.035), transparent 58%),
+    linear-gradient(180deg, #fafafa 0%, #f0f0f2 100%);
+}
+
+html[data-theme="light"] .landing-nav {
+  background: color-mix(in oklch, var(--landing-bg) 92%, transparent);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border-bottom-color: var(--landing-border);
 }
 
 html[data-theme="light"] .landing-nav--dense {
@@ -5701,10 +5721,8 @@ html[data-theme="light"] .landing-nav--dense {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: color-mix(in oklch, var(--landing-bg) 88%, transparent);
-  backdrop-filter: saturate(180%) blur(16px);
-  -webkit-backdrop-filter: saturate(180%) blur(16px);
-  border-bottom: 1px solid var(--landing-border);
+  background: #000000;
+  border-bottom: 1px solid rgb(255 255 255 / 0.06);
   transition:
     border-color 200ms ease,
     background 200ms ease;
@@ -5975,18 +5993,18 @@ html[data-theme="light"] .qrder-logo-svg {
   overflow: clip;
   color: var(--landing-fg);
   --hero-scroll: 0;
-  /* Fond plein : évite que le dégradé du body (accent bleu à droite) ne transparaît aux bords */
-  background-color: var(--landing-bg);
+  background-color: transparent;
 }
 
 .landing-cine-hero-bg {
   position: absolute;
   inset: 0;
   z-index: 0;
-  /* Un seul halo doux centré en haut — pas de spot latéral (évite bande / teinte bizarre à droite) */
+  /* Couches légères par-dessus le fond global : lumière haute + accent froid coin sup. droit + grille */
   background:
-    radial-gradient(ellipse 95% 65% at 50% -18%, rgb(255 255 255 / 0.075), transparent 62%),
-    linear-gradient(180deg, #050505 0%, #000000 45%, #030303 100%);
+    radial-gradient(ellipse 95% 60% at 50% -12%, rgb(255 255 255 / 0.055), transparent 58%),
+    radial-gradient(ellipse 65% 50% at 92% 6%, oklch(0.48 0.14 285 / 0.2), transparent 52%),
+    linear-gradient(180deg, transparent 0%, transparent 100%);
 }
 
 .landing-cine-hero-bg::after {
@@ -5994,11 +6012,10 @@ html[data-theme="light"] .qrder-logo-svg {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgb(255 255 255 / 0.028) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 0.028) 1px, transparent 1px);
+    linear-gradient(rgb(255 255 255 / 0.024) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.024) 1px, transparent 1px);
   background-size: 44px 44px;
-  /* Pas de masque radial : le masque coupait la grille en arc visible (ligne / couture à droite) */
-  opacity: 0.85;
+  opacity: 0.75;
   pointer-events: none;
 }
 
@@ -6159,7 +6176,7 @@ html[data-theme="light"] .landing-cine-hero-vignette {
 
 .landing-cine-showcase {
   position: relative;
-  background: var(--landing-bg);
+  background: transparent;
   padding: clamp(3rem, 8vw, 5rem) 0 clamp(2.5rem, 6vw, 4rem);
 }
 
@@ -6368,7 +6385,7 @@ html[data-theme="light"] .landing-cine-device-glow {
   flex-direction: column;
   gap: 0.45rem;
   padding: 1.15rem 1.1rem;
-  border-radius: 1rem;
+  border-radius: 1.25rem;
   border: 1px solid var(--landing-values-card-border);
   background: var(--landing-values-card-bg);
 }
@@ -7139,6 +7156,7 @@ html[data-theme="light"] .landing-phone-shell {
   border-top: 1px solid var(--landing-border);
   padding: 1.5rem 0 calc(1.5rem + env(safe-area-inset-bottom, 0px));
   margin-top: auto;
+  background: transparent;
 }
 
 .landing-footer-inner {
