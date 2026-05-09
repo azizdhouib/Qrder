@@ -419,8 +419,8 @@ a {
 
 /* Boutons dashboard / pages avec <main> classique uniquement — exclut menu client (main.client-public-menu) */
 /* Exclut aussi les contrôles « Ma carte » (.menu-config-*) pour ne pas écraser onglets / icônes */
-main:not(.client-public-menu) button:not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line),
-.dashboard-app-shell button:not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line) {
+main:not(.client-public-menu) button:not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close),
+.dashboard-app-shell button:not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close) {
   border: none;
   border-radius: 999px;
   padding: 0.62rem 1.35rem;
@@ -436,13 +436,13 @@ main:not(.client-public-menu) button:not(.menu-config-tab):not(.menu-config-icon
   box-shadow: var(--shadow-a);
 }
 
-main:not(.client-public-menu) button:hover:not(.btn-secondary):not(.btn-danger):not(.menu-tab):not(.btn-primary-ios):not(.btn-outline-primary):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(:disabled),
-.dashboard-app-shell button:hover:not(.btn-secondary):not(.btn-danger):not(.menu-tab):not(.btn-primary-ios):not(.btn-outline-primary):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(:disabled) {
+main:not(.client-public-menu) button:hover:not(.btn-secondary):not(.btn-danger):not(.menu-tab):not(.btn-primary-ios):not(.btn-outline-primary):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(:disabled),
+.dashboard-app-shell button:hover:not(.btn-secondary):not(.btn-danger):not(.menu-tab):not(.btn-primary-ios):not(.btn-outline-primary):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(:disabled) {
   box-shadow: var(--shadow-a), 0 6px 18px oklch(0.2 0.02 270 / 0.12);
 }
 
-main:not(.client-public-menu) button:hover:not(:disabled):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line),
-.dashboard-app-shell button:hover:not(:disabled):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line) {
+main:not(.client-public-menu) button:hover:not(:disabled):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close),
+.dashboard-app-shell button:hover:not(:disabled):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close) {
   transform: translateY(-1px);
 }
 
@@ -1435,6 +1435,91 @@ textarea:focus {
   gap: 1rem;
 }
 
+.kds-toast-stack {
+  position: fixed;
+  z-index: 3000;
+  top: max(0.65rem, env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(26rem, calc(100vw - 1rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.kds-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.75rem 0.65rem 0.75rem 0.9rem;
+  border-radius: 0.85rem;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 55%);
+  background: color-mix(in oklch, var(--card), transparent 6%);
+  box-shadow:
+    0 0.35rem 1.1rem color-mix(in oklch, var(--foreground), transparent 88%),
+    0 0 0 1px color-mix(in oklch, var(--border), transparent 40%);
+  animation: kds-toast-in 0.32s ease;
+}
+
+@keyframes kds-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.45rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.kds-toast-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.kds-toast-title {
+  margin: 0 0 0.2rem;
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+}
+
+.kds-toast-detail {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.kds-toast-close {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  margin: -0.15rem -0.1rem -0.15rem 0;
+  padding: 0;
+  border: none;
+  border-radius: 0.45rem;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--muted-foreground);
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.kds-toast-close:hover {
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--secondary), transparent 35%);
+}
+
+.kds-toast-close:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
 .kds-header {
   display: flex;
   flex-wrap: wrap;
@@ -1483,6 +1568,125 @@ textarea:focus {
   gap: 0.5rem;
 }
 
+.kds-alerts-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: min(22rem, 100%);
+}
+
+.kds-alerts-row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 15%);
+  background: color-mix(in oklch, var(--secondary), transparent 40%);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.kds-alerts-row:hover {
+  border-color: color-mix(in oklch, var(--border), transparent 0%);
+}
+
+.kds-alerts-row--busy {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.kds-alerts-row-text {
+  position: relative;
+  z-index: 0;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding-right: 0.25rem;
+}
+
+.kds-alerts-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+}
+
+.kds-ios-switch-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.kds-ios-switch-input:disabled {
+  cursor: not-allowed;
+}
+
+.kds-ios-switch-ui {
+  position: relative;
+  z-index: 0;
+  flex-shrink: 0;
+  width: 51px;
+  height: 31px;
+  margin-top: 0.1rem;
+  pointer-events: none;
+}
+
+.kds-ios-switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--muted-foreground), var(--card) 55%);
+  transition: background 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.kds-ios-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow:
+    0 2px 6px rgb(0 0 0 / 0.18),
+    0 0.5px 1.5px rgb(0 0 0 / 0.12);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.kds-ios-switch-input:checked ~ .kds-ios-switch-ui .kds-ios-switch-track {
+  background: #34c759;
+}
+
+.kds-ios-switch-input:checked ~ .kds-ios-switch-ui .kds-ios-switch-thumb {
+  transform: translateX(20px);
+}
+
+.kds-ios-switch-input:focus-visible ~ .kds-ios-switch-ui .kds-ios-switch-track {
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary), transparent 55%);
+}
+
+.kds-alerts-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  text-align: left;
+}
+
 .kds-live-pill {
   display: inline-flex;
   flex-wrap: wrap;
@@ -1522,6 +1726,17 @@ textarea:focus {
 
 .kds-board.kitchen-board {
   gap: 0.65rem;
+}
+
+/* Ticket en cours de glissement d’une étape à l’autre (animation FLIP / clone) */
+.kds-ticket.kds-ticket--stage-flip {
+  box-shadow:
+    0 0.5rem 1.5rem color-mix(in oklch, var(--foreground), transparent 78%),
+    0 0 0 1px color-mix(in oklch, var(--border), transparent 30%);
+}
+
+.kds-ticket.kds-ticket--stage-flip-clone {
+  will-change: transform, width;
 }
 
 .kds-column .kds-column-head {

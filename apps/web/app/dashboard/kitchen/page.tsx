@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { io } from "socket.io-client";
 import { apiFetch, API_URL } from "@/lib/api";
 import { TokenGate } from "@/components/TokenGate";
+import { playKitchenNewOrderSound, primeKitchenAudio } from "@/lib/kitchenAlerts";
 
 type OrderStatus = "PLACED" | "PREPARING" | "READY" | "SERVED" | "CANCELLED";
 
@@ -54,6 +56,37 @@ const KITCHEN_COLUMNS: {
 
 const KITCHEN_SERVED_VISIBLE_MINUTES = 30;
 const KITCHEN_DISMISSED_SERVED_KEY = "qrder_kitchen_dismissed_served";
+const KITCHEN_ALERTS_STORAGE_KEY = "qrder_kitchen_alerts_on";
+const KITCHEN_TOAST_MAX = 5;
+const KITCHEN_TOAST_MS = 9000;
+/** Glissement visible d’une colonne à l’autre (FLIP + transform sur le ticket réel). */
+const KITCHEN_STAGE_FLIP_MS = 340;
+const KITCHEN_STAGE_FLIP_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
+
+type KitchenInAppToast = {
+  key: string;
+  orderNumber: number;
+  tableName: string;
+  lineCount: number;
+  totalQty: number;
+};
+
+function readKitchenAlertsOn(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(KITCHEN_ALERTS_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function persistKitchenAlertsOn(on: boolean) {
+  try {
+    window.localStorage.setItem(KITCHEN_ALERTS_STORAGE_KEY, on ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
 
 /** Seuils d’affichage « attente » (minutes depuis la prise de commande). */
 const WAIT_ATTENTION_MIN = 12;
@@ -95,6 +128,15 @@ function formatDepuisLabel(createdAt: string, nowMs: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function kitchenToastSummary(t: KitchenInAppToast): string {
+  const parts: string[] = [`Table ${t.tableName}`];
+  if (t.lineCount > 0) {
+    parts.push(`${t.lineCount} ligne${t.lineCount > 1 ? "s" : ""}`);
+    if (t.totalQty > 0) parts.push(`${t.totalQty} article${t.totalQty > 1 ? "s" : ""}`);
+  }
+  return parts.join(" · ");
+}
+
 function formatDepuisTitle(createdAt: string, nowMs: number): string {
   const ms = Math.max(0, nowMs - new Date(createdAt).getTime());
   const totalSec = Math.floor(ms / 1000);
@@ -104,6 +146,21 @@ function formatDepuisTitle(createdAt: string, nowMs: number): string {
   if (h > 0) return `Temps écoulé : ${h} h ${m} min ${s} s`;
   if (m > 0) return `Temps écoulé : ${m} min ${s} s`;
   return `Temps écoulé : ${s} s`;
+}
+
+/** État local immédiat au changement d’étape (en attendant la réponse PATCH). */
+function buildOptimisticKitchenOrder(o: KitchenOrder, status: OrderStatus): KitchenOrder {
+  const nowIso = new Date().toISOString();
+  let preparingStartedAt = o.preparingStartedAt;
+  if (status === "PREPARING" && preparingStartedAt == null) {
+    preparingStartedAt = nowIso;
+  }
+  return {
+    ...o,
+    status,
+    updatedAt: nowIso,
+    preparingStartedAt
+  };
 }
 
 function waitClass(minutes: number): "ok" | "attention" | "urgent" {
@@ -132,6 +189,123 @@ function persistDismissedServedIds(ids: Set<string>) {
   }
 }
 
+function kitchenBoardReducedMotion(): boolean {
+  if (typeof window === "undefined") return true;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function kitchenOrderIdSelectorEscape(orderId: string): string {
+  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+    return CSS.escape(orderId);
+  }
+  return orderId.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+/**
+ * Glissement visible entre colonnes : d’abord FLIP sur le **même** nœud si React le conserve,
+ * sinon clone plein écran (React remonte souvent la carte en changeant de colonne).
+ */
+function animateKitchenTicketStageFlip(orderId: string, applyDomUpdate: () => void): void {
+  if (kitchenBoardReducedMotion() || typeof document === "undefined") {
+    applyDomUpdate();
+    return;
+  }
+  const sel = `[data-kds-order-id="${kitchenOrderIdSelectorEscape(orderId)}"]`;
+  const orig = document.querySelector(sel) as HTMLElement | null;
+  if (!orig || !orig.isConnected) {
+    applyDomUpdate();
+    return;
+  }
+
+  const first = orig.getBoundingClientRect();
+  applyDomUpdate();
+
+  const dest = document.querySelector(sel) as HTMLElement | null;
+  if (!dest) {
+    return;
+  }
+
+  const last = dest.getBoundingClientRect();
+  const dx = first.left - last.left;
+  const dy = first.top - last.top;
+  if (Math.abs(dx) < 0.75 && Math.abs(dy) < 0.75) {
+    return;
+  }
+
+  if (orig.isConnected && dest === orig) {
+    dest.classList.add("kds-ticket--stage-flip");
+    dest.style.zIndex = "50";
+    dest.style.pointerEvents = "none";
+    dest.style.willChange = "transform";
+    dest.style.transition = "none";
+    dest.style.transform = `translate(${dx}px, ${dy}px)`;
+    void dest.offsetHeight;
+
+    let cleaned = false;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      dest.removeEventListener("transitionend", onEnd);
+      dest.style.transition = "";
+      dest.style.transform = "";
+      dest.style.willChange = "";
+      dest.style.zIndex = "";
+      dest.style.pointerEvents = "";
+      dest.classList.remove("kds-ticket--stage-flip");
+    };
+    const onEnd = (e: TransitionEvent) => {
+      if (e.propertyName === "transform") cleanup();
+    };
+    dest.addEventListener("transitionend", onEnd);
+    requestAnimationFrame(() => {
+      if (!dest.isConnected || cleaned) return;
+      dest.style.transition = `transform ${KITCHEN_STAGE_FLIP_MS}ms ${KITCHEN_STAGE_FLIP_EASING}`;
+      dest.style.transform = "";
+    });
+    window.setTimeout(cleanup, KITCHEN_STAGE_FLIP_MS + 120);
+    return;
+  }
+
+  let clone: HTMLElement;
+  try {
+    clone = orig.cloneNode(true) as HTMLElement;
+  } catch {
+    return;
+  }
+  clone.removeAttribute("data-kds-order-id");
+  clone.setAttribute("aria-hidden", "true");
+  clone.classList.add("kds-ticket--stage-flip", "kds-ticket--stage-flip-clone");
+  clone.style.boxSizing = "border-box";
+  clone.style.position = "fixed";
+  clone.style.left = "0";
+  clone.style.top = "0";
+  clone.style.width = `${first.width}px`;
+  clone.style.margin = "0";
+  clone.style.zIndex = "10000";
+  clone.style.pointerEvents = "none";
+  clone.style.transform = `translate(${first.left}px, ${first.top}px)`;
+  clone.style.transition = "none";
+  dest.style.opacity = "0";
+  document.body.appendChild(clone);
+  void clone.offsetHeight;
+
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    if (dest.isConnected) dest.style.opacity = "";
+    clone.remove();
+  };
+
+  requestAnimationFrame(() => {
+    if (cleaned) return;
+    clone.style.transition = `transform ${KITCHEN_STAGE_FLIP_MS}ms ${KITCHEN_STAGE_FLIP_EASING}, width ${KITCHEN_STAGE_FLIP_MS}ms ${KITCHEN_STAGE_FLIP_EASING}`;
+    clone.style.width = `${last.width}px`;
+    clone.style.transform = `translate(${last.left}px, ${last.top}px)`;
+  });
+  window.setTimeout(cleanup, KITCHEN_STAGE_FLIP_MS + 120);
+}
+
 export default function KitchenPage() {
   return (
     <main className="kds-page">
@@ -142,9 +316,72 @@ export default function KitchenPage() {
 
 function KitchenKdsScreen({ token }: { token: string }) {
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
+  const ordersRef = useRef<KitchenOrder[]>([]);
+  ordersRef.current = orders;
   const [restaurantId, setRestaurantId] = useState<string>("");
   const [dismissedServedIds, setDismissedServedIds] = useState<Set<string>>(() => new Set());
+  const [kitchenToasts, setKitchenToasts] = useState<KitchenInAppToast[]>([]);
+  const [alertsOn, setAlertsOn] = useState(readKitchenAlertsOn);
+  const [alertsBusy, setAlertsBusy] = useState(false);
+  const [pendingMoveIds, setPendingMoveIds] = useState<Set<string>>(() => new Set());
+  const alertsOnRef = useRef(alertsOn);
+  const toastTimeoutsRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const waitNow = useIntervalNow(1000);
+
+  useEffect(() => {
+    alertsOnRef.current = alertsOn;
+  }, [alertsOn]);
+
+  useEffect(() => {
+    return () => {
+      toastTimeoutsRef.current.forEach(clearTimeout);
+      toastTimeoutsRef.current.clear();
+    };
+  }, []);
+
+  const dismissKitchenToast = useCallback((key: string) => {
+    const tid = toastTimeoutsRef.current.get(key);
+    if (tid) clearTimeout(tid);
+    toastTimeoutsRef.current.delete(key);
+    setKitchenToasts((prev) => prev.filter((t) => t.key !== key));
+  }, []);
+
+  const enqueueKitchenNewOrderToast = useCallback((order: KitchenOrder) => {
+    if (order.status !== "PLACED") return;
+    const items = order.items ?? [];
+    const lineCount = items.length;
+    const totalQty = items.reduce((s, i) => s + (i.quantity || 0), 0);
+    const key = `${order.id}-${Date.now()}`;
+    setKitchenToasts((prev) => {
+      const next: KitchenInAppToast[] = [
+        ...prev,
+        { key, orderNumber: order.orderNumber, tableName: order.table.name, lineCount, totalQty }
+      ];
+      return next.length > KITCHEN_TOAST_MAX ? next.slice(-KITCHEN_TOAST_MAX) : next;
+    });
+    const tid = setTimeout(() => {
+      toastTimeoutsRef.current.delete(key);
+      setKitchenToasts((prev) => prev.filter((t) => t.key !== key));
+    }, KITCHEN_TOAST_MS);
+    toastTimeoutsRef.current.set(key, tid);
+  }, []);
+
+  const setKitchenAlertsEnabled = useCallback(async (enabled: boolean) => {
+    if (!enabled) {
+      persistKitchenAlertsOn(false);
+      setAlertsOn(false);
+      return;
+    }
+    setAlertsBusy(true);
+    try {
+      primeKitchenAudio();
+      playKitchenNewOrderSound();
+      persistKitchenAlertsOn(true);
+      setAlertsOn(true);
+    } finally {
+      setAlertsBusy(false);
+    }
+  }, []);
 
   function dismissServedFromBoard(orderId: string) {
     setDismissedServedIds((prev) => {
@@ -199,23 +436,41 @@ function KitchenKdsScreen({ token }: { token: string }) {
       };
       setOrders((prev) => {
         if (prev.some((o) => o.id === normalized.id)) return prev;
+        queueMicrotask(() => {
+          if (!alertsOnRef.current) return;
+          playKitchenNewOrderSound();
+          enqueueKitchenNewOrderToast(normalized);
+        });
         return [...prev, normalized];
       });
     });
     socket.on("order.updated", (payload: Partial<KitchenOrder> & { id: string }) => {
-      setOrders((prev) => {
-        const existing = prev.find((o) => o.id === payload.id);
-        const merged = mergeKitchenOrderFromSocket(existing, payload);
-        if (!merged) return prev;
-        const exists = prev.some((o) => o.id === merged.id);
-        if (exists) return prev.map((o) => (o.id === merged.id ? merged : o));
-        return [...prev, merged];
-      });
+      const prev = ordersRef.current;
+      const existing = prev.find((o) => o.id === payload.id);
+      const merged = mergeKitchenOrderFromSocket(existing, payload);
+      if (!merged) return;
+      const statusChanged = existing != null && existing.status !== merged.status;
+
+      const apply = () => {
+        setOrders((p) => {
+          const ex = p.find((o) => o.id === payload.id);
+          const m = mergeKitchenOrderFromSocket(ex, payload);
+          if (!m) return p;
+          const exists = p.some((o) => o.id === m.id);
+          return exists ? p.map((o) => (o.id === m.id ? m : o)) : [...p, m];
+        });
+      };
+
+      if (statusChanged) {
+        animateKitchenTicketStageFlip(payload.id, () => flushSync(apply));
+      } else {
+        apply();
+      }
     });
     return () => {
       socket.disconnect();
     };
-  }, [restaurantId]);
+  }, [restaurantId, enqueueKitchenNewOrderToast]);
 
   useEffect(() => {
     setDismissedServedIds((prev) => {
@@ -271,37 +526,128 @@ function KitchenKdsScreen({ token }: { token: string }) {
   );
 
   async function update(orderId: string, status: OrderStatus) {
-    const updated = await apiFetch<KitchenOrder>(`/kitchen/orders/${orderId}/status`, {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ status })
+    const previousOrder = ordersRef.current.find((o) => o.id === orderId);
+    if (!previousOrder) {
+      const updated = await apiFetch<KitchenOrder>(`/kitchen/orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status })
+      });
+      const normalized: KitchenOrder = {
+        ...updated,
+        preparingStartedAt: updated.preparingStartedAt ?? null,
+        notes: updated.notes ?? null,
+        items: (updated.items ?? []).map((it) => ({
+          ...it,
+          options: Array.isArray(it.options) ? it.options : []
+        }))
+      };
+      setOrders((prev) => {
+        const idx = prev.findIndex((o) => o.id === orderId);
+        if (idx === -1) return [...prev, normalized];
+        return prev.map((o) => (o.id === orderId ? normalized : o));
+      });
+      return;
+    }
+
+    const optimistic = buildOptimisticKitchenOrder(previousOrder, status);
+    animateKitchenTicketStageFlip(orderId, () => {
+      flushSync(() => {
+        setOrders((prev) => prev.map((o) => (o.id === orderId ? optimistic : o)));
+      });
     });
-    const normalized: KitchenOrder = {
-      ...updated,
-      preparingStartedAt: updated.preparingStartedAt ?? null,
-      notes: updated.notes ?? null,
-      items: (updated.items ?? []).map((it) => ({
-        ...it,
-        options: Array.isArray(it.options) ? it.options : []
-      }))
-    };
-    setOrders((prev) => {
-      const idx = prev.findIndex((o) => o.id === orderId);
-      if (idx === -1) return [...prev, normalized];
-      return prev.map((o) => (o.id === orderId ? normalized : o));
-    });
+
+    setPendingMoveIds((prev) => new Set(prev).add(orderId));
+    try {
+      const updated = await apiFetch<KitchenOrder>(`/kitchen/orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status })
+      });
+      const normalized: KitchenOrder = {
+        ...updated,
+        preparingStartedAt: updated.preparingStartedAt ?? null,
+        notes: updated.notes ?? null,
+        items: (updated.items ?? []).map((it) => ({
+          ...it,
+          options: Array.isArray(it.options) ? it.options : []
+        }))
+      };
+      setOrders((prev) => {
+        const idx = prev.findIndex((o) => o.id === orderId);
+        if (idx === -1) return [...prev, normalized];
+        return prev.map((o) => (o.id === orderId ? normalized : o));
+      });
+    } catch (err) {
+      console.error(err);
+      flushSync(() => {
+        setOrders((prev) => prev.map((o) => (o.id === orderId ? previousOrder : o)));
+      });
+    } finally {
+      setPendingMoveIds((prev) => {
+        const next = new Set(prev);
+        next.delete(orderId);
+        return next;
+      });
+    }
   }
 
   const band = serviceBandLabel();
 
+  const alertsHint = useMemo(() => {
+    if (!alertsOn) return "Aucun son ni bannière sur la page pour les nouvelles commandes.";
+    return "Son + bannière en haut de l’écran pour chaque nouvelle commande (reste sur ce site).";
+  }, [alertsOn]);
+
   return (
     <div className="kds-stack">
+      <div className="kds-toast-stack" aria-live="polite" aria-relevant="additions text">
+        {kitchenToasts.map((t) => (
+          <div key={t.key} className="kds-toast" role="status">
+            <div className="kds-toast-body">
+              <p className="kds-toast-title">Nouvelle commande #{t.orderNumber}</p>
+              <p className="kds-toast-detail muted">{kitchenToastSummary(t)}</p>
+            </div>
+            <button
+              type="button"
+              className="kds-toast-close"
+              onClick={() => dismissKitchenToast(t.key)}
+              aria-label="Fermer cette alerte"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
       <header className="kds-header">
         <div className="kds-header-text">
           <p className="kds-service-band">{band}</p>
           <h1 className="kds-title">Écran cuisine (KDS)</h1>
         </div>
         <div className="kds-header-side">
+          <div className="kds-alerts-toolbar">
+            <label className={`kds-alerts-row${alertsBusy ? " kds-alerts-row--busy" : ""}`}>
+              <input
+                type="checkbox"
+                role="switch"
+                className="kds-ios-switch-input"
+                checked={alertsOn}
+                disabled={alertsBusy}
+                aria-checked={alertsOn}
+                onChange={(e) => void setKitchenAlertsEnabled(e.target.checked)}
+              />
+              <span className="kds-alerts-row-text">
+                <span className="kds-alerts-label">Son et alertes sur la page</span>
+                <span className="kds-alerts-hint muted" role="status">
+                  {alertsHint}
+                </span>
+              </span>
+              <span className="kds-ios-switch-ui" aria-hidden="true">
+                <span className="kds-ios-switch-track" />
+                <span className="kds-ios-switch-thumb" />
+              </span>
+            </label>
+          </div>
           <div className="kds-live-pill">
             <span className="kds-live-dot" aria-hidden="true" />
             <span>En direct</span>
@@ -339,6 +685,7 @@ function KitchenKdsScreen({ token }: { token: string }) {
                         key={order.id}
                         order={order}
                         waitNow={waitNow}
+                        movePending={pendingMoveIds.has(order.id)}
                         onMove={update}
                         onDismissFromBoard={dismissServedFromBoard}
                       />
@@ -357,11 +704,13 @@ function KitchenKdsScreen({ token }: { token: string }) {
 function KdsTicketCard({
   order,
   waitNow,
+  movePending,
   onMove,
   onDismissFromBoard
 }: {
   order: KitchenOrder;
   waitNow: number;
+  movePending: boolean;
   onMove: (orderId: string, status: OrderStatus) => void;
   onDismissFromBoard: (orderId: string) => void;
 }) {
@@ -396,6 +745,7 @@ function KdsTicketCard({
 
   return (
     <article
+      data-kds-order-id={order.id}
       className={`kds-ticket panel kitchen-order-card kitchen-order-card--kanban kds-ticket--wait-${wClass}${
         depuisLong ? " kds-ticket--prep-long" : ""
       }${order.status === "SERVED" ? " kitchen-order-served" : ""}`}
@@ -490,7 +840,7 @@ function KdsTicketCard({
         <button
           type="button"
           className="btn-secondary kds-btn-step"
-          disabled={!prev}
+          disabled={!prev || movePending}
           onClick={() => prev && onMove(order.id, prev)}
           title={
             order.status === "SERVED"
@@ -506,7 +856,7 @@ function KdsTicketCard({
         <button
           type="button"
           className="kds-btn-step kds-btn-step-primary"
-          disabled={!next}
+          disabled={!next || movePending}
           onClick={() => next && onMove(order.id, next)}
           title={next ? `Étape suivante : ${labelOf(next)}` : "Dernière étape"}
           aria-label={next ? `Avancer vers ${labelOf(next)}` : "Terminé"}
@@ -518,6 +868,7 @@ function KdsTicketCard({
             <button
               type="button"
               className="btn-secondary kitchen-served-renvoyer kds-btn-full"
+              disabled={movePending}
               onClick={() => onMove(order.id, "PREPARING")}
               title="Erreur de servi : remettre en préparation"
               aria-label="Renvoyer en cuisine"
