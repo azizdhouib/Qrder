@@ -12,10 +12,12 @@ const LS_TABLES_PLAN_ZOOM_LEGACY = "tablesPilotPlanZoomPct_v1";
 const PLAN_ZOOM_MIN_PCT = 140;
 const PLAN_ZOOM_MAX_PCT = 500;
 const LS_TABLES_CARD_SCALE = "tablesPilotCardScalePct_v1";
-/** Seuil en pixels : en dessous, le relâchement ouvre la modale (tap), au‑dessus c’est un déplacement. */
-const FLOOR_TAP_MAX_PX = 16;
-/** Ignore les micro‑déplacements en % avant d’enregistrer une nouvelle position. */
+/** Déplacement en pixels toléré pour considérer un « clic » (sans glisser). */
+const FLOOR_TAP_MAX_PX = 12;
+/** Au‑delà de ce déplacement en % sur le plan, on considère un glissement (pas d’ouverture de la modale). */
 const FLOOR_DRAG_MIN_PCT = 0.12;
+/** Durée max. entre appui et relâchement pour compter comme un clic simple (évite ouvrir la modale au maintien long). */
+const FLOOR_CLICK_MAX_MS = 420;
 
 type FloorRoom = { id: string; name: string; isDefault: boolean };
 
@@ -359,6 +361,7 @@ function TablesPilot({ token }: { token: string }) {
     startClientX: number;
     startClientY: number;
     startPct: { x: number; y: number };
+    startTimeMs: number;
   } | null>(null);
   const dragLastPctRef = useRef<{ x: number; y: number } | null>(null);
   const [dragLivePct, setDragLivePct] = useState<{ tableId: string; x: number; y: number } | null>(null);
@@ -805,7 +808,8 @@ function TablesPilot({ token }: { token: string }) {
       pointerId: e.pointerId,
       startClientX: e.clientX,
       startClientY: e.clientY,
-      startPct
+      startPct,
+      startTimeMs: typeof performance !== "undefined" ? performance.now() : Date.now()
     };
     dragLastPctRef.current = startPct;
     setFloorSnapGuides({ vx: null, hy: null });
@@ -845,15 +849,19 @@ function TablesPilot({ token }: { token: string }) {
     }
     const last = dragLastPctRef.current;
     const totalPx = Math.hypot(e.clientX - s.startClientX, e.clientY - s.startClientY);
-    const isTap = totalPx < FLOOR_TAP_MAX_PX;
+    const smallMovePx = totalPx < FLOOR_TAP_MAX_PX;
     const posChanged =
-      last &&
+      last != null &&
       (Math.abs(last.x - s.startPct.x) > FLOOR_DRAG_MIN_PCT ||
         Math.abs(last.y - s.startPct.y) > FLOOR_DRAG_MIN_PCT);
+    const elapsedMs =
+      (typeof performance !== "undefined" ? performance.now() : Date.now()) - s.startTimeMs;
+    const isQuickClick = smallMovePx && !posChanged && elapsedMs <= FLOOR_CLICK_MAX_MS;
+
     dragSessionRef.current = null;
     dragLastPctRef.current = null;
 
-    if (!isTap && last && posChanged) {
+    if (posChanged && last) {
       setTables((prev) =>
         prev.map((t) => (t.id === table.id ? { ...t, planPosXPct: last.x, planPosYPct: last.y } : t))
       );
@@ -861,9 +869,9 @@ function TablesPilot({ token }: { token: string }) {
     setDragLivePct(null);
     setFloorSnapGuides({ vx: null, hy: null });
 
-    if (!isTap && last && posChanged) {
+    if (posChanged && last) {
       void persistTablePlan(table.id, last.x, last.y);
-    } else if (isTap) {
+    } else if (isQuickClick) {
       setAddTableModalOpen(false);
       setManageTable(table);
     }
@@ -1203,7 +1211,7 @@ function TablesPilot({ token }: { token: string }) {
             <>
               <p className="tables-pilot-edit-banner" role="status">
                 Mode édition : <strong>glisse</strong> une table — magnétisme sur les autres, le centre et la grille
-                (guides en pointillés). <strong>Appuie puis relâche</strong> sans bouger pour{" "}
+                (guides en pointillés). <strong>Clic court</strong> sur une table (sans la déplacer) pour{" "}
                 <strong>renommer</strong> / <strong>supprimer</strong>.{" "}
                 <button type="button" className="link-inline tables-pilot-banner-link" onClick={openAddTableModal}>
                   Ajouter une table
@@ -1300,7 +1308,7 @@ function TablesPilot({ token }: { token: string }) {
                     }}
                     aria-label={
                       tablesEditMode
-                        ? `Table ${table.name}, déplacer, modifier ou supprimer`
+                        ? `Table ${table.name}, glisser pour déplacer ou clic court sans déplacer pour renommer ou supprimer`
                         : `Table ${table.name}, voir les commandes`
                     }
                   >
