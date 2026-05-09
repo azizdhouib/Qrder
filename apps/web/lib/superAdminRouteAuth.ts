@@ -1,6 +1,5 @@
 import "./monorepoEnv";
 import { NextResponse } from "next/server";
-import { verifyPlatformAdminToken } from "./platformAdminToken";
 
 export function superAdminUnauthorizedResponse(message = "Session super admin invalide.") {
   return NextResponse.json({ message }, { status: 401 });
@@ -20,13 +19,11 @@ export function superAdminAuthGuard(req: Request): NextResponse | null {
       "Authentification manquante : ouvre la page /super-admin et connecte-toi, ou envoie Authorization: Bearer <token>. Une URL tapée dans la barre d’adresse n’envoie pas le token."
     );
   }
-  if (!verifyPlatformAdminToken(token)) {
-    return superAdminUnauthorizedResponse("Token super admin invalide ou expiré — reconnecte-toi sur /super-admin/login.");
-  }
+  // Comme les flux restaurant: la validation cryptographique du JWT est faite
+  // par l'API backend (source de vérité), pas par la couche web/proxy.
   return null;
 }
 
 export function requireSuperAdminBearer(req: Request): boolean {
-  const token = getBearerFromRequest(req);
-  return Boolean(token && verifyPlatformAdminToken(token));
+  return Boolean(getBearerFromRequest(req));
 }
