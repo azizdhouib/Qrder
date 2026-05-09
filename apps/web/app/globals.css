@@ -419,8 +419,8 @@ a {
 
 /* Boutons dashboard / pages avec <main> classique uniquement — exclut menu client (main.client-public-menu) */
 /* Exclut aussi les contrôles « Ma carte » (.menu-config-*) pour ne pas écraser onglets / icônes */
-main:not(.client-public-menu) button:not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary),
-.dashboard-app-shell button:not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary) {
+main:not(.client-public-menu) button:not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line),
+.dashboard-app-shell button:not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line) {
   border: none;
   border-radius: 999px;
   padding: 0.62rem 1.35rem;
@@ -436,13 +436,13 @@ main:not(.client-public-menu) button:not(.menu-config-tab):not(.menu-config-icon
   box-shadow: var(--shadow-a);
 }
 
-main:not(.client-public-menu) button:hover:not(.btn-secondary):not(.btn-danger):not(.menu-tab):not(.btn-primary-ios):not(.btn-outline-primary):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(:disabled),
-.dashboard-app-shell button:hover:not(.btn-secondary):not(.btn-danger):not(.menu-tab):not(.btn-primary-ios):not(.btn-outline-primary):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(:disabled) {
+main:not(.client-public-menu) button:hover:not(.btn-secondary):not(.btn-danger):not(.menu-tab):not(.btn-primary-ios):not(.btn-outline-primary):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(:disabled),
+.dashboard-app-shell button:hover:not(.btn-secondary):not(.btn-danger):not(.menu-tab):not(.btn-primary-ios):not(.btn-outline-primary):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(:disabled) {
   box-shadow: var(--shadow-a), 0 6px 18px oklch(0.2 0.02 270 / 0.12);
 }
 
-main:not(.client-public-menu) button:hover:not(:disabled):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary),
-.dashboard-app-shell button:hover:not(:disabled):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary) {
+main:not(.client-public-menu) button:hover:not(:disabled):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line),
+.dashboard-app-shell button:hover:not(:disabled):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line) {
   transform: translateY(-1px);
 }
 
