@@ -1030,6 +1030,8 @@ textarea:focus {
   position: sticky;
   top: 0;
   z-index: 50;
+  /* iPad / encoche : le fond et le blur remontent sous la barre système */
+  padding-top: env(safe-area-inset-top, 0px);
   background: var(--glass-bg);
   -webkit-backdrop-filter: saturate(180%) blur(16px);
   backdrop-filter: saturate(180%) blur(16px);
@@ -1099,6 +1101,14 @@ textarea:focus {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
+}
+
+/* iPad / tablette large : une ligne de navigation comme sur bureau (scroll horizontal discret si trop d’onglets) */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .dashboard-nav {
+    flex-wrap: nowrap;
+    justify-content: center;
+  }
 }
 
 .dashboard-nav-item {
@@ -1381,6 +1391,8 @@ textarea:focus {
 .dashboard-app-shell {
   display: block;
   min-height: 100vh;
+  /* Safari iPad / iOS : évite le « trou » sous la barre d’URL quand 100vh > zone visible */
+  min-height: 100dvh;
 }
 
 .dashboard-main-content {
@@ -1527,6 +1539,13 @@ textarea:focus {
   justify-content: space-between;
   gap: 1rem 1.5rem;
   padding: 0.35rem 0 0.15rem;
+}
+
+@media (min-width: 640px) {
+  .kds-header {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+  }
 }
 
 .kds-header-text {
@@ -2298,45 +2317,17 @@ textarea:focus {
 }
 
 /*
- * KDS : portrait / largeur < 1000px → défilement horizontal (colonnes confortables).
- * Dès 1000px → grille 4 colonnes (iPad mini paysage 1024, toutes les étapes visibles).
+ * KDS : même grille 4 colonnes que le bureau dès la largeur « tablette » (640px+).
+ * Les anciens modes (scroll horizontal 640–999px et min 18rem/colonne) cassaient l’affichage iPad.
+ * Colonnes plus larges uniquement quand il reste assez de place sans scroll horizontal du board.
  */
-@media (min-width: 640px) and (max-width: 999px) {
-  .kitchen-board.kds-board {
-    display: flex !important;
-    overflow-x: auto;
-    scroll-snap-type: x proximity;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 0.5rem;
-    scroll-padding-inline: 0.5rem;
-  }
-
-  .kitchen-board.kds-board .kitchen-board-column {
-    flex: 0 0 auto;
-    min-width: min(88vw, 22.5rem);
-    max-width: 24rem;
-    width: min(88vw, 22.5rem);
-    scroll-snap-align: start;
-  }
-}
-
-@media (min-width: 1000px) {
+@media (min-width: 1320px) {
   .kitchen-board.kds-board {
     display: grid !important;
-    /* Colonnes plus larges qu’en 1fr pur : min ~18rem puis croissance ; léger scroll si l’écran est juste */
-    grid-template-columns: repeat(4, minmax(18rem, 1fr));
-    overflow-x: auto;
+    grid-template-columns: repeat(4, minmax(17rem, 1fr));
+    overflow-x: visible;
     scroll-snap-type: none;
-    -webkit-overflow-scrolling: touch;
     scrollbar-gutter: stable;
-  }
-
-  .kitchen-board.kds-board .kitchen-board-column {
-    min-width: 0;
-    max-width: none;
-    width: auto;
-    flex: unset;
-    scroll-snap-align: unset;
   }
 }
 
