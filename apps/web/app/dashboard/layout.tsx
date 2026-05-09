@@ -13,12 +13,12 @@ const NAV_FULL: DashboardNavItem[] = [
   { href: "/dashboard", label: "Vue d'ensemble" },
   { href: "/dashboard/tables", label: "Tables + QR" },
   { href: "/dashboard/menu", label: "Menu" },
-  { href: "/dashboard/kitchen", label: "Cuisine" },
+  { href: "/dashboard/kitchen", label: "Écran cuisine" },
   { href: "/dashboard/history", label: "Historique" }
 ];
 
 const NAV_KITCHEN: DashboardNavItem[] = [
-  { href: "/dashboard/kitchen", label: "Cuisine" },
+  { href: "/dashboard/kitchen", label: "Écran cuisine" },
   { href: "/dashboard/history", label: "Historique" }
 ];
 

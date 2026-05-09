@@ -59,6 +59,7 @@ async function main() {
     data: {
       name: "Classic Burger",
       description: "Steak, cheddar, salade, sauce maison",
+      tags: ["Maison"],
       priceCents: 1200,
       categoryId: cat.id,
       restaurantId: restaurant.id,

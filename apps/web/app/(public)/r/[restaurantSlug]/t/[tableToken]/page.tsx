@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { io } from "socket.io-client";
-import { ChevronUp, Flame, Leaf, Minus, Plus, X } from "lucide-react";
+import { ChevronUp, Flame, Minus, Plus, X } from "lucide-react";
 import { API_URL, apiFetch } from "@/lib/api";
 
 type MenuData = {
@@ -16,6 +16,7 @@ type MenuData = {
       name: string;
       description?: string;
       imageUrl?: string | null;
+      tags?: string[];
       priceCents: number;
       options: { id: string; name: string; priceDeltaCents: number }[];
     }[];
@@ -48,12 +49,13 @@ function sameCartConfig(menuItemId: string, optionIds: string[], line: CartLine)
   return line.menuItemId === menuItemId && optionSetKey(line.optionIds) === optionSetKey(optionIds);
 }
 
-function itemCartPreset(item: MenuData["categories"][0]["items"][0]) {
-  const firstOption = item.options[0];
-  const optionIds = firstOption ? [firstOption.id] : [];
-  const optionNames = firstOption ? [firstOption.name] : [];
-  const unit = item.priceCents + (firstOption?.priceDeltaCents ?? 0);
-  return { optionIds, optionNames, unit };
+type MenuItemRow = MenuData["categories"][0]["items"][0];
+
+function formatOptionDelta(cents: number): string {
+  const e = cents / 100;
+  if (e === 0) return "";
+  const sign = e > 0 ? "+" : "−";
+  return ` ${sign}${Math.abs(e).toFixed(2)} €`;
 }
 
 export default function PublicMenuPage({
@@ -72,6 +74,8 @@ export default function PublicMenuPage({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetTab, setSheetTab] = useState<"nav" | "cart">("nav");
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+  const [optionPickerItem, setOptionPickerItem] = useState<MenuItemRow | null>(null);
+  const [optionPickerSelectedIds, setOptionPickerSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
     params.then(setResolved);
@@ -97,13 +101,23 @@ export default function PublicMenuPage({
   }, [orderId]);
 
   useEffect(() => {
-    if (!sheetOpen) return;
+    const locked = sheetOpen || optionPickerItem != null;
+    if (!locked) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [sheetOpen]);
+  }, [sheetOpen, optionPickerItem]);
+
+  useEffect(() => {
+    if (!optionPickerItem) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOptionPickerItem(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [optionPickerItem]);
 
   const total = useMemo(
     () => cart.reduce((acc, line) => acc + line.unitPriceCents * line.quantity, 0),
@@ -111,6 +125,12 @@ export default function PublicMenuPage({
   );
 
   const cartCount = useMemo(() => cart.reduce((acc, l) => acc + l.quantity, 0), [cart]);
+
+  const pickerUnitCents = useMemo(() => {
+    if (!optionPickerItem) return 0;
+    const chosen = optionPickerItem.options.filter((o) => optionPickerSelectedIds.includes(o.id));
+    return optionPickerItem.priceCents + chosen.reduce((s, o) => s + o.priceDeltaCents, 0);
+  }, [optionPickerItem, optionPickerSelectedIds]);
 
   if (!menu || !resolved) {
     return (
@@ -156,10 +176,20 @@ export default function PublicMenuPage({
     setSheetOpen(false);
   }
 
-  function addToCart(item: MenuData["categories"][0]["items"][0]) {
-    const { optionIds, optionNames, unit } = itemCartPreset(item);
+  function lastLineOptionIdsForItem(itemId: string): string[] | null {
+    for (let i = cart.length - 1; i >= 0; i--) {
+      if (cart[i].menuItemId === itemId) return [...cart[i].optionIds];
+    }
+    return null;
+  }
+
+  function addCartLineWithOptions(item: MenuItemRow, selectedOptionIds: string[]) {
+    const sorted = [...selectedOptionIds].sort();
+    const chosen = item.options.filter((o) => sorted.includes(o.id));
+    const unit = item.priceCents + chosen.reduce((s, o) => s + o.priceDeltaCents, 0);
+    const optionNames = chosen.map((o) => o.name);
     setCart((prev) => {
-      const idx = prev.findIndex((l) => sameCartConfig(item.id, optionIds, l));
+      const idx = prev.findIndex((l) => sameCartConfig(item.id, sorted, l));
       if (idx >= 0) {
         return prev.map((l, i) => (i === idx ? { ...l, quantity: l.quantity + 1 } : l));
       }
@@ -169,7 +199,7 @@ export default function PublicMenuPage({
           menuItemId: item.id,
           name: item.name,
           quantity: 1,
-          optionIds,
+          optionIds: sorted,
           optionNames,
           unitPriceCents: unit
         }
@@ -177,21 +207,40 @@ export default function PublicMenuPage({
     });
   }
 
-  function subtractFromCart(item: MenuData["categories"][0]["items"][0]) {
-    const { optionIds } = itemCartPreset(item);
+  function openOptionPicker(item: MenuItemRow) {
+    setOptionPickerItem(item);
+    setOptionPickerSelectedIds(lastLineOptionIdsForItem(item.id) ?? []);
+  }
+
+  function confirmOptionPicker() {
+    if (!optionPickerItem) return;
+    addCartLineWithOptions(optionPickerItem, optionPickerSelectedIds);
+    setOptionPickerItem(null);
+  }
+
+  function handleAddPress(item: MenuItemRow) {
+    if (item.options.length > 0) {
+      openOptionPicker(item);
+      return;
+    }
+    addCartLineWithOptions(item, []);
+  }
+
+  function subtractFromCartItem(item: MenuItemRow) {
     setCart((prev) => {
-      const idx = prev.findIndex((l) => sameCartConfig(item.id, optionIds, l));
-      if (idx < 0) return prev;
-      return prev
-        .map((c, i) => (i === idx ? { ...c, quantity: c.quantity - 1 } : c))
-        .filter((c) => c.quantity > 0);
+      for (let i = prev.length - 1; i >= 0; i--) {
+        if (prev[i].menuItemId === item.id) {
+          const line = prev[i];
+          if (line.quantity <= 1) return prev.filter((_, j) => j !== i);
+          return prev.map((l, j) => (j === i ? { ...l, quantity: l.quantity - 1 } : l));
+        }
+      }
+      return prev;
     });
   }
 
-  function qtyForItem(item: MenuData["categories"][0]["items"][0]) {
-    const { optionIds } = itemCartPreset(item);
-    const line = cart.find((l) => sameCartConfig(item.id, optionIds, l));
-    return line?.quantity ?? 0;
+  function qtySumForItem(itemId: string) {
+    return cart.reduce((acc, l) => acc + (l.menuItemId === itemId ? l.quantity : 0), 0);
   }
 
   function adjustLineQuantity(lineIndex: number, delta: number) {
@@ -245,69 +294,87 @@ export default function PublicMenuPage({
             </h2>
             <ul className="divide-y divide-border">
               {cat.items.map((item) => {
-                const qty = qtyForItem(item);
+                const qty = qtySumForItem(item.id);
                 return (
                   <li key={item.id} className="py-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="font-display text-[18px] font-semibold tracking-tight text-foreground">
-                            {item.name}
-                          </p>
-                          <p className="shrink-0 tabular-nums text-[15px] text-muted-foreground">
-                            {(item.priceCents / 100).toFixed(2)} €
-                          </p>
+                    <div className="flex items-start gap-4">
+                      {item.imageUrl ? (
+                        <div className="relative h-[84px] w-[84px] shrink-0 overflow-hidden rounded-[14px] bg-secondary ring-1 ring-border/60">
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            loading="lazy"
+                            decoding="async"
+                            className="h-full w-full object-cover"
+                          />
                         </div>
-                        <p className="mt-1 text-[14px] text-muted-foreground">
-                          {item.description ?? "Plat maison"}
-                        </p>
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          {item.options.length > 0 ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                              <Flame className="h-3 w-3 text-primary" aria-hidden />
-                              Option
-                            </span>
+                      ) : null}
+                      <div className="flex min-w-0 flex-1 items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="font-display text-[18px] font-semibold tracking-tight text-foreground">
+                              {item.name}
+                            </p>
+                            <p className="shrink-0 tabular-nums text-[15px] text-muted-foreground">
+                              {(item.priceCents / 100).toFixed(2)} €
+                            </p>
+                          </div>
+                          {item.description ? (
+                            <p className="mt-1 text-[14px] text-muted-foreground">{item.description}</p>
+                          ) : null}
+                          {(item.tags?.length ?? 0) > 0 || item.options.length > 0 ? (
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              {(item.tags ?? []).map((tag) => (
+                                <span
+                                  key={`${item.id}-${tag}`}
+                                  className="inline-flex rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                              {item.options.length > 0 ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                  <Flame className="h-3 w-3 text-primary" aria-hidden />
+                                  Options
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="shrink-0 pt-0.5">
+                          {qty === 0 ? (
+                            <button
+                              type="button"
+                              aria-label={item.options.length > 0 ? "Choisir les options" : "Ajouter"}
+                              onClick={() => handleAddPress(item)}
+                              className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_2px_8px_-1px_oklch(0.55_0.16_255_/_0.35)] ring-2 ring-primary/20 ring-offset-2 ring-offset-background transition-[transform,box-shadow] hover:scale-105 hover:shadow-[0_4px_14px_-2px_oklch(0.5_0.17_255_/_0.4)] active:scale-95"
+                            >
+                              <Plus className="h-4 w-4" strokeWidth={2.25} aria-hidden />
+                            </button>
                           ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                              <Leaf className="h-3 w-3 text-primary" aria-hidden />
-                              Maison
-                            </span>
+                            <div className="inline-flex items-center gap-1 rounded-full bg-primary/[0.13] px-0.5 py-0.5 text-foreground shadow-sm ring-1 ring-primary/20 backdrop-blur-sm">
+                              <button
+                                type="button"
+                                aria-label="Diminuer"
+                                onClick={() => subtractFromCartItem(item)}
+                                className="flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/15 active:scale-95"
+                              >
+                                <Minus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
+                              </button>
+                              <span className="min-w-[1.25rem] px-0.5 text-center text-[13px] font-semibold tabular-nums text-foreground">
+                                {qty}
+                              </span>
+                              <button
+                                type="button"
+                                aria-label={item.options.length > 0 ? "Ajouter avec options" : "Augmenter"}
+                                onClick={() => handleAddPress(item)}
+                                className="flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/15 active:scale-95"
+                              >
+                                <Plus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
+                              </button>
+                            </div>
                           )}
                         </div>
-                      </div>
-                      <div className="shrink-0 pt-0.5">
-                        {qty === 0 ? (
-                          <button
-                            type="button"
-                            aria-label="Ajouter"
-                            onClick={() => addToCart(item)}
-                            className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_2px_8px_-1px_oklch(0.55_0.16_255_/_0.35)] ring-2 ring-primary/20 ring-offset-2 ring-offset-background transition-[transform,box-shadow] hover:scale-105 hover:shadow-[0_4px_14px_-2px_oklch(0.5_0.17_255_/_0.4)] active:scale-95"
-                          >
-                            <Plus className="h-4 w-4" strokeWidth={2.25} aria-hidden />
-                          </button>
-                        ) : (
-                          <div className="inline-flex items-center gap-1 rounded-full bg-primary/[0.13] px-0.5 py-0.5 text-foreground shadow-sm ring-1 ring-primary/20 backdrop-blur-sm">
-                            <button
-                              type="button"
-                              aria-label="Diminuer"
-                              onClick={() => subtractFromCart(item)}
-                              className="flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/15 active:scale-95"
-                            >
-                              <Minus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-                            </button>
-                            <span className="min-w-[1.25rem] px-0.5 text-center text-[13px] font-semibold tabular-nums text-foreground">
-                              {qty}
-                            </span>
-                            <button
-                              type="button"
-                              aria-label="Augmenter"
-                              onClick={() => addToCart(item)}
-                              className="flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/15 active:scale-95"
-                            >
-                              <Plus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-                            </button>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </li>
@@ -318,10 +385,104 @@ export default function PublicMenuPage({
         ))}
       </div>
 
+      {optionPickerItem && (
+        <div
+          className="fixed inset-0 z-[56] flex flex-col justify-end sm:justify-center sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="option-picker-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 border-0 bg-foreground/40 backdrop-blur-md"
+            aria-label="Fermer"
+            onClick={() => setOptionPickerItem(null)}
+          />
+          <div
+            className="relative mx-auto max-h-[min(88vh,560px)] w-full max-w-lg overflow-y-auto rounded-t-[1.75rem] border border-border bg-card shadow-pop sm:rounded-[1.75rem]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 sm:p-6">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2
+                    id="option-picker-title"
+                    className="font-display text-xl font-semibold tracking-tight text-foreground"
+                  >
+                    {optionPickerItem.name}
+                  </h2>
+                  <p className="mt-1 text-[13px] text-muted-foreground">
+                    Coche les options souhaitées (plusieurs possibles).
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Fermer"
+                  onClick={() => setOptionPickerItem(null)}
+                  className="shrink-0 rounded-full p-2 text-foreground hover:bg-secondary"
+                >
+                  <X className="h-5 w-5" aria-hidden />
+                </button>
+              </div>
+
+              <ul className="flex flex-col gap-2">
+                {optionPickerItem.options.map((opt) => {
+                  const on = optionPickerSelectedIds.includes(opt.id);
+                  const deltaLabel = formatOptionDelta(opt.priceDeltaCents);
+                  return (
+                    <li key={opt.id}>
+                      <button
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() =>
+                          setOptionPickerSelectedIds((prev) =>
+                            prev.includes(opt.id) ? prev.filter((id) => id !== opt.id) : [...prev, opt.id]
+                          )
+                        }
+                        className={
+                          on
+                            ? "flex w-full items-center justify-between gap-3 rounded-2xl border border-primary bg-primary/[0.12] px-4 py-3.5 text-left transition-colors ring-1 ring-primary/25"
+                            : "flex w-full items-center justify-between gap-3 rounded-2xl border border-border bg-secondary/40 px-4 py-3.5 text-left transition-colors hover:bg-secondary/70"
+                        }
+                      >
+                        <span className="text-[15px] font-medium text-foreground">{opt.name}</span>
+                        {deltaLabel ? (
+                          <span className="shrink-0 text-[14px] tabular-nums text-muted-foreground">
+                            {deltaLabel.trim()}
+                          </span>
+                        ) : (
+                          <span className="shrink-0 text-[12px] text-muted-foreground">Inclus</span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              <div className="mt-5 flex items-baseline justify-between gap-4 border-t border-border pt-4">
+                <span className="text-[13px] text-muted-foreground">Total pour 1 portion</span>
+                <span className="font-display text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+                  {(pickerUnitCents / 100).toFixed(2)} €
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={confirmOptionPicker}
+                className="mt-4 w-full rounded-2xl bg-primary py-3.5 text-[15px] font-medium text-primary-foreground shadow-[0_2px_12px_-2px_oklch(0.55_0.17_255_/_0.35)] ring-1 ring-primary/20 transition-[transform,box-shadow] active:scale-[0.99]"
+              >
+                Ajouter au panier
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {cartCount > 0 && !sheetOpen && (
         <button
           type="button"
           onClick={() => {
+            setOptionPickerItem(null);
             setSheetTab("cart");
             setSheetOpen(true);
           }}

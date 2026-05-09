@@ -94,6 +94,8 @@ model MenuItem {
   name         String
   description  String?
   imageUrl     String?
+  /// Étiquettes affichées côté client (ex. « Maison », « Vegan ») — max. 12, chaque libellé ≤ 40 car. côté API.
+  tags         String[]   @default([])
   priceCents   Int
   isActive     Boolean    @default(true)
   categoryId   String
@@ -124,6 +126,8 @@ model Order {
   notes        String?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @default(now()) @updatedAt
+  /// Début du suivi « en cuisine » (fixé à la première entrée en PREPARING, effacé si retour en PLACED).
+  preparingStartedAt DateTime?
   restaurantId String
   restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   tableId      String

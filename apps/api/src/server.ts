@@ -6,6 +6,7 @@ import cors from "cors";
 import express from "express";
 import QRCode from "qrcode";
 import { Server } from "socket.io";
+import type { Prisma } from "@prisma/client";
 import { OrderStatus, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { authRequired, requireRoles, signAuthToken } from "./auth.js";
@@ -46,6 +47,25 @@ function slugify(value: string) {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
+}
+
+const MENU_ITEM_MAX_TAGS = 12;
+const MENU_ITEM_MAX_TAG_LEN = 40;
+
+function normalizeMenuItemTags(raw: string[] | undefined): string[] {
+  if (!raw?.length) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const r of raw) {
+    const t = String(r).trim().slice(0, MENU_ITEM_MAX_TAG_LEN);
+    if (!t) continue;
+    const key = t.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(t);
+    if (out.length >= MENU_ITEM_MAX_TAGS) break;
+  }
+  return out;
 }
 
 app.get("/health", async (_req, res) => {
@@ -327,7 +347,9 @@ app.post("/menu/items", authRequired, staffOnly, async (req, res) => {
       name: z.string().min(1),
       description: z.string().optional(),
       imageUrl: z.string().nullable().optional(),
+      tags: z.array(z.string()).optional().default([]),
       priceCents: z.number().int().positive(),
+      isActive: z.boolean().optional(),
       options: z.array(z.object({ name: z.string().min(1), priceDeltaCents: z.number().int() })).default([])
     })
     .safeParse(req.body);
@@ -345,7 +367,9 @@ app.post("/menu/items", authRequired, staffOnly, async (req, res) => {
       name: body.data.name,
       description: body.data.description,
       imageUrl: body.data.imageUrl ?? null,
+      tags: normalizeMenuItemTags(body.data.tags),
       priceCents: body.data.priceCents,
+      ...(body.data.isActive !== undefined ? { isActive: body.data.isActive } : {}),
       options: {
         create: body.data.options
       }
@@ -355,6 +379,11 @@ app.post("/menu/items", authRequired, staffOnly, async (req, res) => {
   res.status(201).json(item);
 });
 
+const menuItemOptionLine = z.object({
+  name: z.string().min(1),
+  priceDeltaCents: z.number().int()
+});
+
 app.patch("/menu/items/:id", authRequired, staffOnly, async (req, res) => {
   const itemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const body = z
@@ -362,8 +391,11 @@ app.patch("/menu/items/:id", authRequired, staffOnly, async (req, res) => {
       name: z.string().min(1).optional(),
       description: z.string().nullable().optional(),
       imageUrl: z.string().nullable().optional(),
+      tags: z.array(z.string()).optional(),
       priceCents: z.number().int().positive().optional(),
-      isActive: z.boolean().optional()
+      isActive: z.boolean().optional(),
+      categoryId: z.string().min(1).optional(),
+      options: z.array(menuItemOptionLine).optional()
     })
     .safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Invalid payload", issues: body.error.issues });
@@ -373,9 +405,36 @@ app.patch("/menu/items/:id", authRequired, staffOnly, async (req, res) => {
   });
   if (!existing) return res.status(404).json({ message: "Item not found" });
 
+  const patch = body.data;
+  if (patch.categoryId !== undefined) {
+    const cat = await db.menuCategory.findFirst({
+      where: { id: patch.categoryId, restaurantId: req.user!.restaurantId }
+    });
+    if (!cat) return res.status(400).json({ message: "Catégorie introuvable" });
+  }
+
+  const data: Prisma.MenuItemUpdateInput = {};
+  if (patch.name !== undefined) data.name = patch.name;
+  if (patch.description !== undefined) data.description = patch.description;
+  if (patch.imageUrl !== undefined) data.imageUrl = patch.imageUrl;
+  if (patch.tags !== undefined) {
+    data.tags = { set: normalizeMenuItemTags(patch.tags) };
+  }
+  if (patch.priceCents !== undefined) data.priceCents = patch.priceCents;
+  if (patch.isActive !== undefined) data.isActive = patch.isActive;
+  if (patch.categoryId !== undefined) {
+    data.category = { connect: { id: patch.categoryId } };
+  }
+  if (patch.options !== undefined) {
+    data.options = {
+      deleteMany: {},
+      create: patch.options.map((o) => ({ name: o.name, priceDeltaCents: o.priceDeltaCents }))
+    };
+  }
+
   const updated = await db.menuItem.update({
     where: { id: itemId },
-    data: body.data,
+    data,
     include: { options: true }
   });
   res.json(updated);
@@ -754,15 +813,25 @@ app.patch("/kitchen/orders/:id/status", authRequired, async (req, res) => {
   if (!body.success) return res.status(400).json({ message: "Invalid payload" });
   const orderId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
-  const existing = await db.order.findFirst({
+  const existingOrder = await db.order.findFirst({
     where: { id: orderId, restaurantId: req.user!.restaurantId },
-    select: { id: true }
+    select: { id: true, status: true }
   });
-  if (!existing) return res.status(404).json({ message: "Order not found" });
+  if (!existingOrder) return res.status(404).json({ message: "Order not found" });
+
+  const nextStatus = body.data.status;
+  const prevStatus = existingOrder.status;
+
+  const prepData: { preparingStartedAt?: Date | null } = {};
+  if (nextStatus === OrderStatus.PREPARING && prevStatus !== OrderStatus.PREPARING) {
+    prepData.preparingStartedAt = new Date();
+  } else if (nextStatus === OrderStatus.PLACED) {
+    prepData.preparingStartedAt = null;
+  }
 
   const updated = await db.order.update({
     where: { id: orderId },
-    data: { status: body.data.status },
+    data: { status: nextStatus, ...prepData },
     include: { table: true, items: { include: { options: true } } }
   });
 

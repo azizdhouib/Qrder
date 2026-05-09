@@ -12,10 +12,17 @@ type KitchenOrder = {
   orderNumber: number;
   status: OrderStatus;
   createdAt: string;
-  /** Dernière maj (ex. passage en Servi) — pour tri et fenêtre 30 min côté API */
   updatedAt?: string;
+  /** ISO — défini par l’API au passage en PREPARING. */
+  preparingStartedAt: string | null;
+  notes: string | null;
   table: { name: string };
-  items: { id: string; nameSnapshot: string; quantity: number }[];
+  items: {
+    id: string;
+    nameSnapshot: string;
+    quantity: number;
+    options: { id: string; nameSnapshot: string }[];
+  }[];
 };
 
 const FORWARD: Record<OrderStatus, OrderStatus | null> = {
@@ -34,18 +41,76 @@ const BACKWARD: Record<OrderStatus, OrderStatus | null> = {
   CANCELLED: null
 };
 
-/** Colonnes du tableau (ordre affiché = flux cuisine, façon Jira). */
-const KITCHEN_COLUMNS: { status: OrderStatus; title: string }[] = [
-  { status: "PLACED", title: "En attente" },
-  { status: "PREPARING", title: "En preparation" },
-  { status: "READY", title: "Pret" },
-  { status: "SERVED", title: "Servi" }
+const KITCHEN_COLUMNS: {
+  status: OrderStatus;
+  title: string;
+  hint: string;
+}[] = [
+  { status: "PLACED", title: "Nouvelles", hint: "À démarrer" },
+  { status: "PREPARING", title: "En préparation", hint: "En cours" },
+  { status: "READY", title: "Prêtes", hint: "À servir" },
+  { status: "SERVED", title: "Servies", hint: "File de fin" }
 ];
 
-/** Doit correspondre au paramètre recentMinutes de l’API cuisine (fenêtre colonne Servi). */
 const KITCHEN_SERVED_VISIBLE_MINUTES = 30;
-
 const KITCHEN_DISMISSED_SERVED_KEY = "qrder_kitchen_dismissed_served";
+
+/** Seuils d’affichage « attente » (minutes depuis la prise de commande). */
+const WAIT_ATTENTION_MIN = 12;
+const WAIT_URGENT_MIN = 25;
+
+function useIntervalNow(intervalMs: number) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
+
+function serviceBandLabel(): string {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 11) return "Service du matin";
+  if (h >= 11 && h < 15) return "Service du midi";
+  if (h >= 15 && h < 19) return "Entre les services";
+  return "Service du soir";
+}
+
+function formatOrderTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function minutesSince(createdAt: string, nowMs: number) {
+  return Math.floor((nowMs - new Date(createdAt).getTime()) / 60_000);
+}
+
+/** Temps écoulé depuis la commande : format compact une ligne (ex. 8:03 puis 1:08:05) pour petits écrans / colonnes étroites. */
+function formatDepuisLabel(createdAt: string, nowMs: number): string {
+  const ms = Math.max(0, nowMs - new Date(createdAt).getTime());
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function formatDepuisTitle(createdAt: string, nowMs: number): string {
+  const ms = Math.max(0, nowMs - new Date(createdAt).getTime());
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `Temps écoulé : ${h} h ${m} min ${s} s`;
+  if (m > 0) return `Temps écoulé : ${m} min ${s} s`;
+  return `Temps écoulé : ${s} s`;
+}
+
+function waitClass(minutes: number): "ok" | "attention" | "urgent" {
+  if (minutes >= WAIT_URGENT_MIN) return "urgent";
+  if (minutes >= WAIT_ATTENTION_MIN) return "attention";
+  return "ok";
+}
 
 function readDismissedServedIds(): Set<string> {
   if (typeof window === "undefined") return new Set();
@@ -69,23 +134,17 @@ function persistDismissedServedIds(ids: Set<string>) {
 
 export default function KitchenPage() {
   return (
-    <main className="container stack kitchen-focus">
-      <section className="hero">
-        <span className="badge">Cuisine</span>
-        <h1 className="hero-title">Commandes en direct</h1>
-        <p className="hero-subtitle">
-          Fais avancer chaque commande d&apos;une étape à l&apos;autre selon où elle en est.
-        </p>
-      </section>
-      <TokenGate>{(token) => <KitchenScreen token={token} />}</TokenGate>
+    <main className="kds-page">
+      <TokenGate>{(token) => <KitchenKdsScreen token={token} />}</TokenGate>
     </main>
   );
 }
 
-function KitchenScreen({ token }: { token: string }) {
+function KitchenKdsScreen({ token }: { token: string }) {
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [restaurantId, setRestaurantId] = useState<string>("");
   const [dismissedServedIds, setDismissedServedIds] = useState<Set<string>>(() => new Set());
+  const waitNow = useIntervalNow(1000);
 
   function dismissServedFromBoard(orderId: string) {
     setDismissedServedIds((prev) => {
@@ -102,7 +161,17 @@ function KitchenScreen({ token }: { token: string }) {
       `/kitchen/orders?includeRecentServed=true&recentMinutes=${KITCHEN_SERVED_VISIBLE_MINUTES}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    setOrders(data);
+    setOrders(
+      data.map((o) => ({
+        ...o,
+        preparingStartedAt: o.preparingStartedAt ?? null,
+        notes: o.notes ?? null,
+        items: (o.items ?? []).map((it) => ({
+          ...it,
+          options: Array.isArray(it.options) ? it.options : []
+        }))
+      }))
+    );
   }
 
   useEffect(() => {
@@ -119,9 +188,18 @@ function KitchenScreen({ token }: { token: string }) {
     const socket = io(API_URL);
     socket.emit("joinRestaurant", restaurantId);
     socket.on("order.created", (order: KitchenOrder) => {
+      const normalized: KitchenOrder = {
+        ...order,
+        preparingStartedAt: order.preparingStartedAt ?? null,
+        notes: order.notes ?? null,
+        items: (order.items ?? []).map((it) => ({
+          ...it,
+          options: Array.isArray(it.options) ? it.options : []
+        }))
+      };
       setOrders((prev) => {
-        if (prev.some((o) => o.id === order.id)) return prev;
-        return [...prev, order];
+        if (prev.some((o) => o.id === normalized.id)) return prev;
+        return [...prev, normalized];
       });
     });
     socket.on("order.updated", (payload: Partial<KitchenOrder> & { id: string }) => {
@@ -198,43 +276,69 @@ function KitchenScreen({ token }: { token: string }) {
       headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify({ status })
     });
+    const normalized: KitchenOrder = {
+      ...updated,
+      preparingStartedAt: updated.preparingStartedAt ?? null,
+      notes: updated.notes ?? null,
+      items: (updated.items ?? []).map((it) => ({
+        ...it,
+        options: Array.isArray(it.options) ? it.options : []
+      }))
+    };
     setOrders((prev) => {
       const idx = prev.findIndex((o) => o.id === orderId);
-      if (idx === -1) return [...prev, updated];
-      return prev.map((o) => (o.id === orderId ? updated : o));
+      if (idx === -1) return [...prev, normalized];
+      return prev.map((o) => (o.id === orderId ? normalized : o));
     });
   }
 
+  const band = serviceBandLabel();
+
   return (
-    <div className="stack">
-      <section>
-        <div className="row-between" style={{ marginBottom: 12 }}>
-          <h2 className="section-title" style={{ margin: 0 }}>
-            Commandes ({liveCount})
-          </h2>
+    <div className="kds-stack">
+      <header className="kds-header">
+        <div className="kds-header-text">
+          <p className="kds-service-band">{band}</p>
+          <h1 className="kds-title">Écran cuisine (KDS)</h1>
         </div>
-        <div className="kitchen-board" role="region" aria-label="Tableau des commandes par etape">
+        <div className="kds-header-side">
+          <div className="kds-live-pill">
+            <span className="kds-live-dot" aria-hidden="true" />
+            <span>En direct</span>
+            <span className="kds-live-sep">·</span>
+            <strong className="kds-live-count">{liveCount}</strong>
+            <span> commande{liveCount !== 1 ? "s" : ""}</span>
+          </div>
+        </div>
+      </header>
+
+      <section className="kds-board-wrap" aria-label="Commandes par étape">
+        <div className="kitchen-board kds-board" role="region">
           {KITCHEN_COLUMNS.map((col) => {
             const columnOrders = ordersByStatus[col.status];
             return (
-              <div key={col.status} className="kitchen-board-column">
-                <header className="kitchen-board-column-header">
-                  <h3
-                    className="kitchen-board-column-title"
-                    aria-label={`${col.title}, ${columnOrders.length} commande${columnOrders.length !== 1 ? "s" : ""}`}
+              <div key={col.status} className="kitchen-board-column kds-column">
+                <header className="kitchen-board-column-header kds-column-head">
+                  <h2
+                    className="kitchen-board-column-title kds-column-title"
+                    aria-label={`${col.title}, ${columnOrders.length} ticket${columnOrders.length !== 1 ? "s" : ""}`}
                   >
-                    <span className="kitchen-board-stage-name">{col.title}</span>
-                    <span className="kitchen-board-count kitchen-board-count--inline">{columnOrders.length}</span>
-                  </h3>
+                    <span className="kds-column-title-row">
+                      <span className="kitchen-board-stage-name">{col.title}</span>
+                      <span className="kitchen-board-count kitchen-board-count--inline">{columnOrders.length}</span>
+                    </span>
+                    <span className="kds-column-hint muted">{col.hint}</span>
+                  </h2>
                 </header>
-                <div className={`kitchen-board-column-body kitchen-board-column-body--${col.status.toLowerCase()}`}>
+                <div className={`kitchen-board-column-body kitchen-board-column-body--${col.status.toLowerCase()} kds-column-body`}>
                   {columnOrders.length === 0 ? (
-                    <p className="kitchen-board-empty muted">Aucune commande</p>
+                    <p className="kitchen-board-empty muted kds-empty">Aucune commande</p>
                   ) : (
                     columnOrders.map((order) => (
-                      <KitchenOrderKanbanCard
+                      <KdsTicketCard
                         key={order.id}
                         order={order}
+                        waitNow={waitNow}
                         onMove={update}
                         onDismissFromBoard={dismissServedFromBoard}
                       />
@@ -250,32 +354,126 @@ function KitchenScreen({ token }: { token: string }) {
   );
 }
 
-function KitchenOrderKanbanCard({
+function KdsTicketCard({
   order,
+  waitNow,
   onMove,
   onDismissFromBoard
 }: {
   order: KitchenOrder;
+  waitNow: number;
   onMove: (orderId: string, status: OrderStatus) => void;
   onDismissFromBoard: (orderId: string) => void;
 }) {
+  const itemIdsKey = order.items.map((i) => i.id).join(",");
+  const [doneLineIds, setDoneLineIds] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    setDoneLineIds(new Set());
+  }, [itemIdsKey]);
+
+  useEffect(() => {
+    if (order.status !== "PREPARING") setDoneLineIds(new Set());
+  }, [order.status]);
+
+  function toggleLineItem(itemId: string) {
+    if (order.status !== "PREPARING") return;
+    setDoneLineIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }
+
   const next = FORWARD[order.status];
   const prev = BACKWARD[order.status];
+  const waitMin = minutesSince(order.createdAt, waitNow);
+  const wClass = waitClass(waitMin);
+  const linePickMode = order.status === "PREPARING";
+  const elapsedMs = Math.max(0, waitNow - new Date(order.createdAt).getTime());
+  const depuisLong = elapsedMs >= 10 * 60 * 1000;
+
   return (
-    <article className={`panel kitchen-order-card kitchen-order-card--kanban${order.status === "SERVED" ? " kitchen-order-served" : ""}`}>
-      <div className="kitchen-order-card-head">
-        <h3 className="panel-title kitchen-order-title">
-          #{order.orderNumber} — Table {order.table.name}
-        </h3>
+    <article
+      className={`kds-ticket panel kitchen-order-card kitchen-order-card--kanban kds-ticket--wait-${wClass}${
+        depuisLong ? " kds-ticket--prep-long" : ""
+      }${order.status === "SERVED" ? " kitchen-order-served" : ""}`}
+    >
+      <div className="kds-ticket-top">
+        <div className="kds-ticket-id-block">
+          <span className="kds-ticket-number" aria-label={`Commande numéro ${order.orderNumber}`}>
+            #{order.orderNumber}
+          </span>
+          <span className="kds-ticket-table">Table {order.table.name}</span>
+        </div>
         <span className={`status kitchen-order-status ${statusClass(order.status)}`}>{labelOf(order.status)}</span>
       </div>
-      <div className="kitchen-order-items">
-        {order.items.map((item) => (
-          <p key={item.id} className="muted">
-            {item.quantity}x {item.nameSnapshot}
-          </p>
-        ))}
+
+      <div className={`kds-ticket-times kds-ticket-times--${wClass}`}>
+        <div className="kds-time-row">
+          <span className="kds-time-label">Commande</span>
+          <span className="kds-time-value">{formatOrderTime(order.createdAt)}</span>
+        </div>
+        <div
+          className={`kds-time-row kds-time-row--emph kds-time-row--depuis${depuisLong ? " kds-time-row--prep-long" : ""}`}
+        >
+          <span className="kds-time-label">Depuis</span>
+          <span
+            className="kds-time-value kds-depuis-value"
+            title={formatDepuisTitle(order.createdAt, waitNow)}
+          >
+            {formatDepuisLabel(order.createdAt, waitNow)}
+          </span>
+        </div>
       </div>
+
+      {order.notes?.trim() ? (
+        <div className="kds-ticket-notes">
+          <span className="kds-notes-label">Note client</span>
+          <p className="kds-notes-body">{order.notes.trim()}</p>
+        </div>
+      ) : null}
+
+      <ul className="kds-lines">
+        {order.items.map((item) => {
+          const lineDone = linePickMode && doneLineIds.has(item.id);
+          const lineLabel = `${item.quantity}× ${item.nameSnapshot}`;
+          const inner = (
+            <>
+              <div className="kds-line-main">
+                <span className="kds-line-qty">{item.quantity}×</span>
+                <span className="kds-line-name">{item.nameSnapshot}</span>
+              </div>
+              {item.options.length > 0 ? (
+                <ul className="kds-line-options">
+                  {item.options.map((opt) => (
+                    <li key={opt.id}>+ {opt.nameSnapshot}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </>
+          );
+          return (
+            <li key={item.id} className="kds-line-wrap">
+              {linePickMode ? (
+                <button
+                  type="button"
+                  className={`kds-line${lineDone ? " kds-line--done" : ""}`}
+                  onClick={() => toggleLineItem(item.id)}
+                  aria-pressed={lineDone}
+                  aria-label={lineDone ? `Annuler ${lineLabel}` : `Valider ${lineLabel}`}
+                >
+                  {inner}
+                </button>
+              ) : (
+                <div className="kds-line-static">{inner}</div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
       {order.status === "SERVED" && (
         <ServedAutoRemoveTimer
           updatedAt={order.updatedAt}
@@ -283,52 +481,54 @@ function KitchenOrderKanbanCard({
           windowMinutes={KITCHEN_SERVED_VISIBLE_MINUTES}
         />
       )}
+
       <div
-        className={`kitchen-order-actions kitchen-order-actions--kanban${
+        className={`kitchen-order-actions kitchen-order-actions--kanban kds-ticket-actions${
           order.status === "SERVED" ? " kitchen-order-actions--served" : ""
         }`}
       >
         <button
           type="button"
-          className="btn-secondary"
+          className="btn-secondary kds-btn-step"
           disabled={!prev}
           onClick={() => prev && onMove(order.id, prev)}
           title={
             order.status === "SERVED"
-              ? "Annuler le servi : retour a Pret"
+              ? "Annuler le servi : retour à Prêtes"
               : prev
-                ? `Etape precedente : ${labelOf(prev)}`
-                : "Deja en premiere etape"
+                ? `Étape précédente : ${labelOf(prev)}`
+                : "Déjà en première étape"
           }
           aria-label={prev ? `Reculer vers ${labelOf(prev)}` : "Impossible de reculer"}
         >
-          <span aria-hidden="true">←</span>
+          <span aria-hidden="true">←</span> Préc.
         </button>
         <button
           type="button"
+          className="kds-btn-step kds-btn-step-primary"
           disabled={!next}
           onClick={() => next && onMove(order.id, next)}
-          title={next ? `Etape suivante : ${labelOf(next)}` : "Derniere etape"}
-          aria-label={next ? `Avancer vers ${labelOf(next)}` : "Impossible d'avancer"}
+          title={next ? `Étape suivante : ${labelOf(next)}` : "Dernière étape"}
+          aria-label={next ? `Avancer vers ${labelOf(next)}` : "Terminé"}
         >
-          <span aria-hidden="true">→</span>
+          Suiv. <span aria-hidden="true">→</span>
         </button>
         {order.status === "SERVED" && (
           <>
             <button
               type="button"
-              className="btn-secondary kitchen-served-renvoyer"
+              className="btn-secondary kitchen-served-renvoyer kds-btn-full"
               onClick={() => onMove(order.id, "PREPARING")}
-              title="Erreur de servi : remettre la commande en preparation"
+              title="Erreur de servi : remettre en préparation"
               aria-label="Renvoyer en cuisine"
             >
               Renvoyer en cuisine
             </button>
             <button
               type="button"
-              className="btn-secondary kitchen-served-dismiss"
+              className="btn-secondary kitchen-served-dismiss kds-btn-full"
               onClick={() => onDismissFromBoard(order.id)}
-              title="Retire la commande de cet écran. Elle reste consultable dans l'historique."
+              title="Retire le ticket de cet écran. Consultable dans Historique."
               aria-label="Retirer du tableau"
             >
               Retirer du tableau
@@ -375,11 +575,11 @@ function ServedAutoRemoveTimer({
 
   return (
     <p
-      className={`kitchen-served-expiry muted${urgent ? " kitchen-served-expiry--urgent" : ""}`}
+      className={`kitchen-served-expiry muted kds-served-timer${urgent ? " kitchen-served-expiry--urgent" : ""}`}
       role="timer"
       aria-label={ariaLabel}
     >
-      <span className="kitchen-served-expiry-label">Disparition auto dans </span>
+      <span className="kitchen-served-expiry-label">Masquage auto dans </span>
       <span className="kitchen-served-expiry-time">{remaining <= 0 ? "0:00" : timeStr}</span>
     </p>
   );
@@ -390,15 +590,22 @@ function servedExpiryAriaLabel(remaining: number): string {
   const totalSec = Math.ceil(remaining / 1000);
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
-  if (m === 0) return `Disparition automatique dans ${s} seconde${s > 1 ? "s" : ""}`;
-  if (s === 0) return `Disparition automatique dans ${m} minute${m > 1 ? "s" : ""}`;
-  return `Disparition automatique dans ${m} minute${m > 1 ? "s" : ""} et ${s} seconde${s > 1 ? "s" : ""}`;
+  if (m === 0) return `Masquage automatique dans ${s} seconde${s > 1 ? "s" : ""}`;
+  if (s === 0) return `Masquage automatique dans ${m} minute${m > 1 ? "s" : ""}`;
+  return `Masquage automatique dans ${m} minute${m > 1 ? "s" : ""} et ${s} seconde${s > 1 ? "s" : ""}`;
 }
 
 function mergeKitchenOrderFromSocket(
   existing: KitchenOrder | undefined,
   payload: Partial<KitchenOrder> & { id: string }
 ): KitchenOrder | null {
+  const items = payload.items
+    ? payload.items.map((it) => ({
+        ...it,
+        options: Array.isArray(it.options) ? it.options : []
+      }))
+    : undefined;
+
   if (!existing) {
     const complete =
       payload.orderNumber != null &&
@@ -406,23 +613,38 @@ function mergeKitchenOrderFromSocket(
       payload.createdAt &&
       payload.table &&
       Array.isArray(payload.items);
-    return complete ? (payload as KitchenOrder) : null;
+    if (!complete) return null;
+    const p = payload as KitchenOrder;
+    return {
+      ...p,
+      preparingStartedAt: p.preparingStartedAt ?? null,
+      notes: p.notes ?? null,
+      items: (p.items ?? []).map((it) => ({
+        ...it,
+        options: Array.isArray(it.options) ? it.options : []
+      }))
+    };
   }
   return {
     ...existing,
     ...payload,
+    notes: payload.notes !== undefined ? payload.notes : existing.notes,
+    preparingStartedAt:
+      payload.preparingStartedAt !== undefined
+        ? payload.preparingStartedAt
+        : existing.preparingStartedAt,
     table: payload.table ?? existing.table,
-    items: payload.items ?? existing.items,
+    items: items ?? existing.items,
     updatedAt: payload.updatedAt ?? existing.updatedAt
   };
 }
 
 function labelOf(status: OrderStatus): string {
-  if (status === "PLACED") return "En attente";
-  if (status === "PREPARING") return "En preparation";
-  if (status === "READY") return "Pret";
-  if (status === "SERVED") return "Servi";
-  return "Annule";
+  if (status === "PLACED") return "Nouvelle";
+  if (status === "PREPARING") return "En préparation";
+  if (status === "READY") return "Prête";
+  if (status === "SERVED") return "Servie";
+  return "Annulée";
 }
 
 function statusClass(status: OrderStatus) {

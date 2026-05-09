@@ -282,8 +282,8 @@ function DashboardAnalytics({ token }: { token: string }) {
             <p className="muted">Configurer catégories, plats, prix et options.</p>
           </a>
           <a className="link-card" href="/dashboard/kitchen">
-            <p className="section-title">Interface cuisine</p>
-            <p className="muted">Commandes en live et statuts.</p>
+            <p className="section-title">Écran cuisine (KDS)</p>
+            <p className="muted">Affichage cuisine type KDS, pensé tablette : commandes, temps, tables, options.</p>
           </a>
           <a className="link-card" href="/dashboard/history">
             <p className="section-title">Historique</p>
