@@ -4,7 +4,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { jsPDF } from "jspdf";
 import { API_URL, apiFetch } from "@/lib/api";
 import { TokenGate } from "@/components/TokenGate";
-import { AlertTriangle, Download, Pencil, QrCode, RefreshCw, X } from "lucide-react";
+import { AlertTriangle, Building2, Download, Pencil, QrCode, RefreshCw, X } from "lucide-react";
+
+/** Zoom zone du plan : min = ancien 140 % (taille de salle « compacte »), au‑dessus = plus d’espace vertical. */
+const LS_TABLES_PLAN_ZOOM = "tablesPilotPlanZoomPct_v2";
+const LS_TABLES_PLAN_ZOOM_LEGACY = "tablesPilotPlanZoomPct_v1";
+const PLAN_ZOOM_MIN_PCT = 140;
+const PLAN_ZOOM_MAX_PCT = 500;
+const LS_TABLES_CARD_SCALE = "tablesPilotCardScalePct_v1";
+/** Seuil en pixels : en dessous, le relâchement ouvre la modale (tap), au‑dessus c’est un déplacement. */
+const FLOOR_TAP_MAX_PX = 16;
+/** Ignore les micro‑déplacements en % avant d’enregistrer une nouvelle position. */
+const FLOOR_DRAG_MIN_PCT = 0.12;
+
+type FloorRoom = { id: string; name: string; isDefault: boolean };
 
 type Table = {
   id: string;
@@ -12,6 +25,7 @@ type Table = {
   qrToken: string;
   planPosXPct?: number | null;
   planPosYPct?: number | null;
+  roomId?: string | null;
 };
 
 type MeResponse = {
@@ -319,9 +333,23 @@ function TablesPilot({ token }: { token: string }) {
   const [createNameError, setCreateNameError] = useState<string | null>(null);
   const [addTableModalOpen, setAddTableModalOpen] = useState(false);
   const [createSaving, setCreateSaving] = useState(false);
+  const [rooms, setRooms] = useState<FloorRoom[]>([]);
+  const [floorRoomFilterId, setFloorRoomFilterId] = useState<string | null>(null);
+  const [roomsManageModalOpen, setRoomsManageModalOpen] = useState(false);
+  const [roomDraftNames, setRoomDraftNames] = useState<Record<string, string>>({});
+  const [roomsManageError, setRoomsManageError] = useState<string | null>(null);
+  const [roomActionBusyId, setRoomActionBusyId] = useState<string | null>(null);
+  const [planZoomPct, setPlanZoomPct] = useState(PLAN_ZOOM_MIN_PCT);
+  const [cardScalePct, setCardScalePct] = useState(100);
+  const [addRoomModalOpen, setAddRoomModalOpen] = useState(false);
+  const [addRoomName, setAddRoomName] = useState("");
+  const [addRoomError, setAddRoomError] = useState<string | null>(null);
+  const [addRoomSaving, setAddRoomSaving] = useState(false);
+  const [manageRoomId, setManageRoomId] = useState<string>("");
   const closeModalButtonRef = useRef<HTMLButtonElement>(null);
   const closeManageRef = useRef<HTMLButtonElement>(null);
   const closeAddTableRef = useRef<HTMLButtonElement>(null);
+  const closeAddRoomRef = useRef<HTMLButtonElement>(null);
   const closeQrSheetRef = useRef<HTMLButtonElement>(null);
   const closeRegenerateQrRef = useRef<HTMLButtonElement>(null);
   const floorCanvasRef = useRef<HTMLDivElement>(null);
@@ -331,7 +359,6 @@ function TablesPilot({ token }: { token: string }) {
     startClientX: number;
     startClientY: number;
     startPct: { x: number; y: number };
-    moved: boolean;
   } | null>(null);
   const dragLastPctRef = useRef<{ x: number; y: number } | null>(null);
   const [dragLivePct, setDragLivePct] = useState<{ tableId: string; x: number; y: number } | null>(null);
@@ -344,6 +371,35 @@ function TablesPilot({ token }: { token: string }) {
     () => [...tables].sort((a, b) => a.name.localeCompare(b.name, "fr", { numeric: true, sensitivity: "base" })),
     [tables]
   );
+
+  const defaultRoomId = useMemo(
+    () => rooms.find((r) => r.isDefault)?.id ?? rooms[0]?.id ?? null,
+    [rooms]
+  );
+
+  const effectiveFloorRoomId = useMemo(
+    () =>
+      floorRoomFilterId && rooms.some((x) => x.id === floorRoomFilterId)
+        ? floorRoomFilterId
+        : (defaultRoomId ?? ""),
+    [floorRoomFilterId, rooms, defaultRoomId]
+  );
+
+  const planTables = useMemo(() => {
+    if (rooms.length === 0 || !floorRoomFilterId) return [];
+    return sortedTables.filter((t) => t.roomId === floorRoomFilterId);
+  }, [sortedTables, floorRoomFilterId, rooms.length]);
+
+  useEffect(() => {
+    if (!defaultRoomId) {
+      setFloorRoomFilterId(null);
+      return;
+    }
+    setFloorRoomFilterId((prev) => {
+      if (prev && rooms.some((r) => r.id === prev)) return prev;
+      return defaultRoomId;
+    });
+  }, [defaultRoomId, rooms]);
 
   const floorByTableId = useMemo(() => {
     const m = new Map<string, FloorKey>();
@@ -361,13 +417,64 @@ function TablesPilot({ token }: { token: string }) {
     return n;
   }, [tables, floorByTableId]);
 
+  /** Même hauteur de zone pour toutes les salles : basée sur la salle principale (ex. Salle 1), pas sur la salle affichée. */
+  const floorPlanLayoutTableCount = useMemo(() => {
+    if (sortedTables.length === 0) return 0;
+    if (!defaultRoomId) return sortedTables.length;
+    const inDefault = sortedTables.filter((t) => t.roomId === defaultRoomId).length;
+    if (inDefault > 0) return inDefault;
+    if (rooms.length === 0) return sortedTables.length;
+    return Math.max(
+      1,
+      rooms.reduce((mx, r) => Math.max(mx, sortedTables.filter((t) => t.roomId === r.id).length), 0)
+    );
+  }, [sortedTables, defaultRoomId, rooms]);
+
   const floorCanvasMinRem = useMemo(() => {
-    const n = sortedTables.length;
-    if (n <= 0) return 14;
+    const n = floorPlanLayoutTableCount;
+    const zoom = planZoomPct / 100;
+    if (n <= 0) return 14 * zoom;
     const cols = Math.min(5, Math.max(1, Math.ceil(Math.sqrt(n))));
     const rows = Math.ceil(n / cols);
-    return Math.max(15, 6 + rows * 5.85);
-  }, [sortedTables.length]);
+    const base = Math.max(15, 6 + rows * 5.85);
+    return base * zoom;
+  }, [floorPlanLayoutTableCount, planZoomPct]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const z2 = Number(localStorage.getItem(LS_TABLES_PLAN_ZOOM));
+      if (!Number.isNaN(z2) && z2 > 0) {
+        setPlanZoomPct(Math.min(PLAN_ZOOM_MAX_PCT, Math.max(PLAN_ZOOM_MIN_PCT, z2)));
+      } else {
+        const z1 = Number(localStorage.getItem(LS_TABLES_PLAN_ZOOM_LEGACY));
+        if (!Number.isNaN(z1) && z1 >= 70 && z1 <= 140) {
+          const migrated = Math.round(PLAN_ZOOM_MIN_PCT + ((z1 - 70) / 70) * (PLAN_ZOOM_MAX_PCT - PLAN_ZOOM_MIN_PCT));
+          setPlanZoomPct(Math.min(PLAN_ZOOM_MAX_PCT, Math.max(PLAN_ZOOM_MIN_PCT, migrated)));
+        }
+      }
+      const c = Number(localStorage.getItem(LS_TABLES_CARD_SCALE));
+      if (!Number.isNaN(c) && c >= 80 && c <= 140) setCardScalePct(c);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_TABLES_PLAN_ZOOM, String(planZoomPct));
+    } catch {
+      /* ignore */
+    }
+  }, [planZoomPct]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_TABLES_CARD_SCALE, String(cardScalePct));
+    } catch {
+      /* ignore */
+    }
+  }, [cardScalePct]);
 
   const closeQrSheetModal = useCallback(() => {
     setQrSheetItems((prev) => {
@@ -443,8 +550,11 @@ function TablesPilot({ token }: { token: string }) {
     const from = startOfLocalDay(now);
     const qs = `?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(now.toISOString())}`;
     try {
-      const [tableList, meRes, ko, a] = await Promise.all([
+      const [tableList, roomList, meRes, ko, a] = await Promise.all([
         apiFetch<Table[]>("/tables", { headers: { Authorization: `Bearer ${token}` } }),
+        apiFetch<FloorRoom[]>("/floor-rooms", { headers: { Authorization: `Bearer ${token}` } }).catch(
+          () => [] as FloorRoom[]
+        ),
         apiFetch<MeResponse>("/me", { headers: { Authorization: `Bearer ${token}` } }),
         apiFetch<KitchenOrder[]>("/kitchen/orders?includeRecentServed=false", {
           headers: { Authorization: `Bearer ${token}` }
@@ -454,6 +564,9 @@ function TablesPilot({ token }: { token: string }) {
         }).catch(() => null)
       ]);
       setTables(tableList);
+      setRooms(
+        Array.isArray(roomList) ? roomList.map((r) => ({ ...r, isDefault: Boolean(r.isDefault) })) : []
+      );
       setMe(meRes);
       setKitchenOrders(
         (Array.isArray(ko) ? ko : []).map((o) => ({
@@ -500,6 +613,78 @@ function TablesPilot({ token }: { token: string }) {
     }
   }, [sortedTables.length, token, load, qrSheetModalOpen, closeQrSheetModal]);
 
+  const closeAddRoomModal = useCallback(() => {
+    setAddRoomModalOpen(false);
+    setAddRoomName("");
+    setAddRoomError(null);
+    setAddRoomSaving(false);
+  }, []);
+
+  const closeRoomsManageModal = useCallback(() => {
+    setRoomsManageModalOpen(false);
+    setRoomsManageError(null);
+    setRoomActionBusyId(null);
+    setRoomDraftNames({});
+  }, []);
+
+  function openRoomsManageModal() {
+    if (!tablesEditMode) return;
+    const m: Record<string, string> = {};
+    for (const r of rooms) m[r.id] = r.name;
+    setRoomDraftNames(m);
+    setRoomsManageError(null);
+    setRoomsManageModalOpen(true);
+  }
+
+  async function saveRoomDraft(roomId: string) {
+    const name = (roomDraftNames[roomId] ?? "").trim();
+    if (!name) {
+      setRoomsManageError("Le nom de la salle ne peut pas être vide.");
+      return;
+    }
+    setRoomsManageError(null);
+    setRoomActionBusyId(roomId);
+    try {
+      const updated = await apiFetch<FloorRoom>(`/floor-rooms/${roomId}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name })
+      });
+      setRooms((prev) =>
+        prev
+          .map((r) => (r.id === roomId ? { ...r, ...updated } : r))
+          .sort((a, b) => a.name.localeCompare(b.name, "fr", { numeric: true, sensitivity: "base" }))
+      );
+      setRoomDraftNames((prev) => ({ ...prev, [roomId]: updated.name }));
+    } catch (e) {
+      setRoomsManageError(parseApiErrorMessage(e));
+    } finally {
+      setRoomActionBusyId(null);
+    }
+  }
+
+  async function deleteRoom(room: FloorRoom) {
+    if (room.isDefault) return;
+    const ok = window.confirm(
+      `Supprimer la salle « ${room.name} » ? Les tables de cette salle seront déplacées vers la salle principale.`
+    );
+    if (!ok) return;
+    setRoomsManageError(null);
+    setRoomActionBusyId(room.id);
+    try {
+      await apiFetch(`/floor-rooms/${room.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      await load();
+      closeRoomsManageModal();
+    } catch (e) {
+      setRoomsManageError(parseApiErrorMessage(e));
+    } finally {
+      setRoomActionBusyId(null);
+    }
+  }
+
   useEffect(() => {
     setOrigin(window.location.origin);
     load().catch(console.error);
@@ -510,6 +695,8 @@ function TablesPilot({ token }: { token: string }) {
       modalTable != null ||
       manageTable != null ||
       addTableModalOpen ||
+      addRoomModalOpen ||
+      roomsManageModalOpen ||
       qrSheetModalOpen ||
       regenerateQrModalOpen;
     if (!open) return;
@@ -518,6 +705,8 @@ function TablesPilot({ token }: { token: string }) {
     const id = window.requestAnimationFrame(() => {
       if (addTableModalOpen) {
         document.getElementById("tables-add-modal-name")?.focus();
+      } else if (addRoomModalOpen) {
+        closeAddRoomRef.current?.focus();
       } else if (qrSheetModalOpen) {
         closeQrSheetRef.current?.focus();
       } else if (regenerateQrModalOpen) {
@@ -531,6 +720,8 @@ function TablesPilot({ token }: { token: string }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (addTableModalOpen) setAddTableModalOpen(false);
+      else if (addRoomModalOpen) closeAddRoomModal();
+      else if (roomsManageModalOpen) closeRoomsManageModal();
       else if (qrSheetModalOpen) closeQrSheetModal();
       else if (regenerateQrModalOpen && !regenerateQrBusy) closeRegenerateQrModal();
       else if (manageTable) setManageTable(null);
@@ -546,22 +737,29 @@ function TablesPilot({ token }: { token: string }) {
     modalTable,
     manageTable,
     addTableModalOpen,
+    addRoomModalOpen,
+    roomsManageModalOpen,
     qrSheetModalOpen,
     regenerateQrModalOpen,
     closeQrSheetModal,
     closeRegenerateQrModal,
+    closeAddRoomModal,
+    closeRoomsManageModal,
     regenerateQrBusy
   ]);
 
   useEffect(() => {
     if (!manageTable) {
       setManageName("");
+      setManageRoomId("");
       setManageError(null);
       return;
     }
+    const defId = rooms.find((r) => r.isDefault)?.id ?? rooms[0]?.id ?? "";
     setManageName(manageTable.name);
+    setManageRoomId(manageTable.roomId ?? defId);
     setManageError(null);
-  }, [manageTable]);
+  }, [manageTable, rooms]);
 
   useEffect(() => {
     if (!tablesEditMode) {
@@ -597,7 +795,7 @@ function TablesPilot({ token }: { token: string }) {
     if (rect.width < 8 || rect.height < 8) return;
 
     e.preventDefault();
-    const total = sortedTables.length;
+    const total = planTables.length;
     const base = planPctForTable(table, index, total);
     const startPct =
       dragLivePct?.tableId === table.id ? { x: dragLivePct.x, y: dragLivePct.y } : base;
@@ -607,8 +805,7 @@ function TablesPilot({ token }: { token: string }) {
       pointerId: e.pointerId,
       startClientX: e.clientX,
       startClientY: e.clientY,
-      startPct,
-      moved: false
+      startPct
     };
     dragLastPctRef.current = startPct;
     setFloorSnapGuides({ vx: null, hy: null });
@@ -624,12 +821,11 @@ function TablesPilot({ token }: { token: string }) {
     const rect = canvas.getBoundingClientRect();
     const dx = ((e.clientX - s.startClientX) / rect.width) * 100;
     const dy = ((e.clientY - s.startClientY) / rect.height) * 100;
-    if (Math.hypot(e.clientX - s.startClientX, e.clientY - s.startClientY) > 5) s.moved = true;
     const rawX = clampFloorPct(s.startPct.x + dx);
     const rawY = clampFloorPct(s.startPct.y + dy);
-    const total = sortedTables.length;
-    const candsX = buildFloorSnapCandidates("x", sortedTables, table.id, total);
-    const candsY = buildFloorSnapCandidates("y", sortedTables, table.id, total);
+    const total = planTables.length;
+    const candsX = buildFloorSnapCandidates("x", planTables, table.id, total);
+    const candsY = buildFloorSnapCandidates("y", planTables, table.id, total);
     const thX = Math.min(5.2, Math.max(1.15, (14 / rect.width) * 100));
     const thY = Math.min(5.2, Math.max(1.15, (14 / rect.height) * 100));
     const sx = snapAxisToNearest(rawX, candsX, thX);
@@ -647,12 +843,17 @@ function TablesPilot({ token }: { token: string }) {
     } catch {
       /* already released */
     }
-    const moved = s.moved;
     const last = dragLastPctRef.current;
+    const totalPx = Math.hypot(e.clientX - s.startClientX, e.clientY - s.startClientY);
+    const isTap = totalPx < FLOOR_TAP_MAX_PX;
+    const posChanged =
+      last &&
+      (Math.abs(last.x - s.startPct.x) > FLOOR_DRAG_MIN_PCT ||
+        Math.abs(last.y - s.startPct.y) > FLOOR_DRAG_MIN_PCT);
     dragSessionRef.current = null;
     dragLastPctRef.current = null;
 
-    if (moved && last) {
+    if (!isTap && last && posChanged) {
       setTables((prev) =>
         prev.map((t) => (t.id === table.id ? { ...t, planPosXPct: last.x, planPosYPct: last.y } : t))
       );
@@ -660,9 +861,9 @@ function TablesPilot({ token }: { token: string }) {
     setDragLivePct(null);
     setFloorSnapGuides({ vx: null, hy: null });
 
-    if (moved && last) {
+    if (!isTap && last && posChanged) {
       void persistTablePlan(table.id, last.x, last.y);
-    } else if (!moved) {
+    } else if (isTap) {
       setAddTableModalOpen(false);
       setManageTable(table);
     }
@@ -696,14 +897,59 @@ function TablesPilot({ token }: { token: string }) {
       } else {
         setManageTable(null);
         setAddTableModalOpen(false);
+        setAddRoomModalOpen(false);
+        setAddRoomName("");
+        setAddRoomError(null);
+        setRoomsManageModalOpen(false);
+        setRoomsManageError(null);
+        setRoomDraftNames({});
       }
       return next;
     });
   }
 
+  async function createFloorRoom() {
+    const trimmed = addRoomName.trim();
+    if (!trimmed) {
+      setAddRoomError("Indique un nom de salle.");
+      return;
+    }
+    if (rooms.some((r) => r.name.trim().toLowerCase() === trimmed.toLowerCase())) {
+      setAddRoomError("Une salle avec ce nom existe déjà.");
+      return;
+    }
+    setAddRoomError(null);
+    setAddRoomSaving(true);
+    try {
+      const created = await apiFetch<FloorRoom>("/floor-rooms", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: trimmed })
+      });
+      setRooms((prev) =>
+        [...prev, { ...created, isDefault: Boolean(created.isDefault) }].sort(
+          (a, b) =>
+            Number(b.isDefault) - Number(a.isDefault) ||
+            a.name.localeCompare(b.name, "fr", { numeric: true, sensitivity: "base" })
+        )
+      );
+      setAddRoomName("");
+      setAddRoomModalOpen(false);
+    } catch (e) {
+      setAddRoomError(parseApiErrorMessage(e));
+    } finally {
+      setAddRoomSaving(false);
+    }
+  }
+
   async function createTable() {
     const trimmed = name.trim();
     if (!trimmed) return;
+    const targetRoomId = floorRoomFilterId ?? defaultRoomId;
+    if (!targetRoomId) {
+      setCreateNameError("Aucune salle disponible. Recharge la page ou contacte le support.");
+      return;
+    }
     if (tableNameTaken(tables, trimmed)) {
       setCreateNameError("Ce nom est déjà utilisé.");
       return;
@@ -714,7 +960,7 @@ function TablesPilot({ token }: { token: string }) {
       await apiFetch("/tables", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name: trimmed })
+        body: JSON.stringify({ name: trimmed, roomId: targetRoomId })
       });
       setName("");
       setAddTableModalOpen(false);
@@ -741,10 +987,18 @@ function TablesPilot({ token }: { token: string }) {
     setManageError(null);
     setManageSaving(true);
     try {
+      const roomIdResolved = manageRoomId || defaultRoomId;
+      if (!roomIdResolved) {
+        setManageError("Aucune salle disponible.");
+        return;
+      }
       await apiFetch<Table>(`/tables/${manageTable.id}`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name: trimmed })
+        body: JSON.stringify({
+          name: trimmed,
+          roomId: roomIdResolved
+        })
       });
       setManageTable(null);
       await load();
@@ -849,47 +1103,129 @@ function TablesPilot({ token }: { token: string }) {
       <div className="tables-pilot-body">
         <section className="panel tables-pilot-plan-card" aria-labelledby="tables-plan-title">
           <div className="tables-pilot-plan-head">
-            <h2 id="tables-plan-title" className="tables-pilot-plan-title">
-              Plan de salle
-            </h2>
-            <div className="tables-pilot-legend" aria-label="Légende des états">
-              <span className="tables-pilot-legend-item">
-                <span className="tables-pilot-dot tables-pilot-dot--libre" aria-hidden />
-                Libre
-              </span>
-              <span className="tables-pilot-legend-item">
-                <span className="tables-pilot-dot tables-pilot-dot--salle" aria-hidden />
-                En salle
-              </span>
-              <span className="tables-pilot-legend-item">
-                <span className="tables-pilot-dot tables-pilot-dot--cuisine" aria-hidden />
-                Cuisine
-              </span>
-              <span className="tables-pilot-legend-item">
-                <span className="tables-pilot-dot tables-pilot-dot--servir" aria-hidden />
-                À servir
-              </span>
+            <div className="tables-pilot-plan-head-main">
+              <div className="tables-pilot-plan-title-block">
+                <h2 id="tables-plan-title" className="tables-pilot-plan-title">
+                  Plan de salle
+                </h2>
+                {rooms.length > 0 ? (
+                  <div
+                    className="tables-floor-room-tabs"
+                    role="tablist"
+                    aria-label="Salle affichée sur le plan"
+                  >
+                    {rooms.map((r) => {
+                      const active = r.id === effectiveFloorRoomId;
+                      return (
+                        <button
+                          key={r.id}
+                          type="button"
+                          role="tab"
+                          aria-selected={active}
+                          id={`tables-floor-room-tab-${r.id}`}
+                          className={`tables-floor-room-tab${active ? " tables-floor-room-tab--active" : ""}`}
+                          onClick={() => setFloorRoomFilterId(r.id)}
+                        >
+                          {r.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+              <div className="tables-pilot-legend" aria-label="Légende des états">
+                <span className="tables-pilot-legend-item">
+                  <span className="tables-pilot-dot tables-pilot-dot--libre" aria-hidden />
+                  Libre
+                </span>
+                <span className="tables-pilot-legend-item">
+                  <span className="tables-pilot-dot tables-pilot-dot--salle" aria-hidden />
+                  En salle
+                </span>
+                <span className="tables-pilot-legend-item">
+                  <span className="tables-pilot-dot tables-pilot-dot--cuisine" aria-hidden />
+                  Cuisine
+                </span>
+                <span className="tables-pilot-legend-item">
+                  <span className="tables-pilot-dot tables-pilot-dot--servir" aria-hidden />
+                  À servir
+                </span>
+              </div>
+              <button
+                type="button"
+                className={`btn-secondary tables-pilot-edit-link${tablesEditMode ? " tables-pilot-edit-link--active" : ""}`}
+                onClick={toggleTablesEditMode}
+                aria-pressed={tablesEditMode}
+              >
+                <Pencil size={16} strokeWidth={2} aria-hidden />
+                {tablesEditMode ? "Terminer" : "Modifier"}
+              </button>
             </div>
-            <button
-              type="button"
-              className={`btn-secondary tables-pilot-edit-link${tablesEditMode ? " tables-pilot-edit-link--active" : ""}`}
-              onClick={toggleTablesEditMode}
-              aria-pressed={tablesEditMode}
-            >
-              <Pencil size={16} strokeWidth={2} aria-hidden />
-              {tablesEditMode ? "Terminer" : "Modifier"}
-            </button>
+            {tablesEditMode && sortedTables.length > 0 ? (
+              <div className="tables-pilot-plan-scale-tools" aria-label="Zoom du plan et taille des tables">
+                <div className="tables-pilot-scale-field">
+                  <label htmlFor="tables-plan-zoom">Zoom de la zone du plan</label>
+                  <div className="tables-pilot-scale-row">
+                    <input
+                      id="tables-plan-zoom"
+                      type="range"
+                      className="tables-pilot-range"
+                      min={PLAN_ZOOM_MIN_PCT}
+                      max={PLAN_ZOOM_MAX_PCT}
+                      step={5}
+                      value={planZoomPct}
+                      onChange={(e) => setPlanZoomPct(Number(e.target.value))}
+                    />
+                    <span className="tables-pilot-scale-value tabular-nums">{planZoomPct}%</span>
+                  </div>
+                </div>
+                <div className="tables-pilot-scale-field">
+                  <label htmlFor="tables-card-scale">Taille des tables</label>
+                  <div className="tables-pilot-scale-row">
+                    <input
+                      id="tables-card-scale"
+                      type="range"
+                      className="tables-pilot-range"
+                      min={80}
+                      max={140}
+                      step={5}
+                      value={cardScalePct}
+                      onChange={(e) => setCardScalePct(Number(e.target.value))}
+                    />
+                    <span className="tables-pilot-scale-value tabular-nums">{cardScalePct}%</span>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {tablesEditMode ? (
-            <p className="tables-pilot-edit-banner" role="status">
-              Mode édition : <strong>glisse</strong> une table — magnétisme sur les autres, le centre et la grille
-              (guides en pointillés). <strong>Clique</strong> sans bouger pour <strong>renommer</strong> /{" "}
-              <strong>supprimer</strong>.{" "}
-              <button type="button" className="link-inline tables-pilot-banner-link" onClick={openAddTableModal}>
-                Ajouter une table
-              </button>
-            </p>
+            <>
+              <p className="tables-pilot-edit-banner" role="status">
+                Mode édition : <strong>glisse</strong> une table — magnétisme sur les autres, le centre et la grille
+                (guides en pointillés). <strong>Appuie puis relâche</strong> sans bouger pour{" "}
+                <strong>renommer</strong> / <strong>supprimer</strong>.{" "}
+                <button type="button" className="link-inline tables-pilot-banner-link" onClick={openAddTableModal}>
+                  Ajouter une table
+                </button>
+              </p>
+              <div className="tables-pilot-room-bar tables-pilot-room-bar--edit-links" role="toolbar" aria-label="Salles">
+                <button type="button" className="link-inline tables-pilot-banner-link" onClick={openRoomsManageModal}>
+                  Gérer les salles
+                </button>
+                <button
+                  type="button"
+                  className="link-inline tables-pilot-banner-link tables-pilot-room-add-link"
+                  onClick={() => {
+                    setAddRoomError(null);
+                    setAddRoomName("");
+                    setAddRoomModalOpen(true);
+                  }}
+                >
+                  + Ajouter une salle
+                </button>
+              </div>
+            </>
           ) : null}
 
           {loading ? (
@@ -898,12 +1234,21 @@ function TablesPilot({ token }: { token: string }) {
             <p className="muted tables-pilot-plan-empty">
               Aucune table — clique sur <strong>Modifier</strong>, puis sur <strong>Ajouter une table</strong>.
             </p>
+          ) : planTables.length === 0 ? (
+            <p className="muted tables-pilot-plan-empty">
+              Aucune table dans cette salle. Choisis une autre salle dans le menu, ou clique sur{" "}
+              <strong>Modifier</strong> puis <strong>Ajouter une table</strong>.
+            </p>
           ) : (
-            <div
-              ref={floorCanvasRef}
-              className={`tables-floor-canvas${tablesEditMode ? " tables-floor-canvas--edit" : ""}`}
-              style={{ minHeight: `${floorCanvasMinRem}rem` }}
-            >
+            <div className="tables-floor-zoom-host">
+              <div
+                ref={floorCanvasRef}
+                className={`tables-floor-canvas${tablesEditMode ? " tables-floor-canvas--edit" : ""}`}
+                style={{
+                  minHeight: `${floorCanvasMinRem}rem`,
+                  ["--tables-floor-card-scale" as string]: String(cardScalePct / 100)
+                }}
+              >
               {tablesEditMode && floorSnapGuides.vx != null ? (
                 <div
                   className="tables-floor-snap-line tables-floor-snap-line--v"
@@ -918,9 +1263,9 @@ function TablesPilot({ token }: { token: string }) {
                   aria-hidden
                 />
               ) : null}
-              {sortedTables.map((table, index) => {
+              {planTables.map((table, index) => {
                 const fk = floorByTableId.get(table.id) ?? "libre";
-                const total = sortedTables.length;
+                const total = planTables.length;
                 const pos =
                   dragLivePct?.tableId === table.id
                     ? { x: dragLivePct.x, y: dragLivePct.y }
@@ -966,30 +1311,10 @@ function TablesPilot({ token }: { token: string }) {
                   </div>
                 );
               })}
+              </div>
             </div>
           )}
         </section>
-
-        <aside className="panel tables-pilot-top-card" aria-labelledby="tables-top-title">
-          <h2 id="tables-top-title" className="tables-pilot-top-title">
-            Top du jour
-          </h2>
-          {!analytics || analytics.topItems.length === 0 ? (
-            <p className="muted tables-pilot-top-empty">Pas encore de ventes aujourd’hui.</p>
-          ) : (
-            <ol className="tables-pilot-top-list">
-              {analytics.topItems.slice(0, 8).map((item, i) => (
-                <li key={`${item.name}-${i}`} className="tables-pilot-top-row">
-                  <span className="tables-pilot-top-rank tabular-nums">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span className="tables-pilot-top-name">{item.name}</span>
-                  <span className="tables-pilot-top-price tabular-nums">{formatEur(item.revenueCents)}</span>
-                </li>
-              ))}
-            </ol>
-          )}
-        </aside>
       </div>
 
       {modalTable ? (
@@ -1145,6 +1470,27 @@ function TablesPilot({ token }: { token: string }) {
                   autoComplete="off"
                 />
               </div>
+              <div className="tables-manage-field">
+                <label className="tables-manage-label" htmlFor="tables-manage-room">
+                  Salle
+                </label>
+                <select
+                  id="tables-manage-room"
+                  className="tables-manage-input tables-manage-select"
+                  value={manageRoomId || (defaultRoomId ?? "")}
+                  onChange={(e) => {
+                    setManageRoomId(e.target.value);
+                    setManageError(null);
+                  }}
+                >
+                  {rooms.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                      {r.isDefault ? " (principale)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
               {manageError ? (
                 <p className="tables-manage-error" role="alert">
                   {manageError}
@@ -1206,7 +1552,8 @@ function TablesPilot({ token }: { token: string }) {
                 </h2>
                 <p className="tables-modal-sub muted">
                   Nom court (ex. T1, Terrasse 3). Un QR unique est généré automatiquement. Chaque nom doit être
-                  unique (insensible à la casse).
+                  unique (insensible à la casse). La table sera créée dans la salle{" "}
+                  <strong>{rooms.find((r) => r.id === (floorRoomFilterId ?? defaultRoomId))?.name ?? "…"}</strong>.
                 </p>
               </div>
               <button
@@ -1261,6 +1608,207 @@ function TablesPilot({ token }: { token: string }) {
                     {createSaving ? "Création…" : "Créer la table"}
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {addRoomModalOpen ? (
+        <div className="tables-modal-root" role="presentation">
+          <button
+            type="button"
+            className="tables-modal-backdrop"
+            aria-label="Fermer la fenêtre"
+            onClick={closeAddRoomModal}
+          />
+          <div
+            className="tables-modal-panel tables-modal-panel--manage"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="tables-add-room-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="tables-modal-head tables-modal-head--manage">
+              <div>
+                <p className="tables-manage-eyebrow">
+                  <Building2 size={14} strokeWidth={2} className="tables-manage-eyebrow-icon" aria-hidden />
+                  Plan de salle
+                </p>
+                <h2 id="tables-add-room-title" className="tables-modal-title">
+                  Ajouter une salle
+                </h2>
+                <p className="tables-modal-sub muted">
+                  Ex. Terrasse, Étage. Tu peux aussi déplacer une table vers une autre salle depuis{" "}
+                  <strong>Modifier</strong> sur une table.
+                </p>
+              </div>
+              <button
+                ref={closeAddRoomRef}
+                type="button"
+                className="btn-secondary tables-modal-close"
+                onClick={closeAddRoomModal}
+                aria-label="Fermer"
+              >
+                <X size={20} strokeWidth={2} aria-hidden />
+              </button>
+            </header>
+            <div className="tables-modal-body tables-modal-body--manage">
+              <div className="tables-manage-field">
+                <label className="tables-manage-label" htmlFor="tables-add-room-name">
+                  Nom de la salle
+                </label>
+                <input
+                  id="tables-add-room-name"
+                  className="tables-manage-input"
+                  value={addRoomName}
+                  onChange={(e) => {
+                    setAddRoomName(e.target.value);
+                    setAddRoomError(null);
+                  }}
+                  placeholder="Ex. Terrasse, Étage"
+                  autoComplete="off"
+                  aria-invalid={addRoomError ? true : undefined}
+                />
+              </div>
+              {addRoomError ? (
+                <p className="tables-manage-error" role="alert">
+                  {addRoomError}
+                </p>
+              ) : null}
+              <div className="tables-manage-footer">
+                <div className="tables-manage-footer-row">
+                  <button
+                    type="button"
+                    className="tables-add-room-btn-cancel"
+                    disabled={addRoomSaving}
+                    onClick={closeAddRoomModal}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    className="tables-add-room-btn-save"
+                    disabled={addRoomSaving}
+                    onClick={() => void createFloorRoom()}
+                  >
+                    {addRoomSaving ? "Création…" : "Créer la salle"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {roomsManageModalOpen ? (
+        <div className="tables-modal-root" role="presentation">
+          <button
+            type="button"
+            className="tables-modal-backdrop"
+            aria-label="Fermer la fenêtre"
+            onClick={closeRoomsManageModal}
+          />
+          <div
+            className="tables-modal-panel tables-modal-panel--manage tables-modal-panel--rooms-manage"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="tables-rooms-manage-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="tables-modal-head tables-modal-head--manage tables-modal-head--rooms-manage">
+              <div>
+                <p className="tables-manage-eyebrow">
+                  <Building2 size={14} strokeWidth={2} className="tables-manage-eyebrow-icon" aria-hidden />
+                  Plan de salle
+                </p>
+                <h2 id="tables-rooms-manage-title" className="tables-modal-title">
+                  Gérer les salles
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="btn-secondary tables-modal-close"
+                onClick={closeRoomsManageModal}
+                aria-label="Fermer"
+              >
+                <X size={20} strokeWidth={2} aria-hidden />
+              </button>
+            </header>
+            <div className="tables-modal-body tables-modal-body--manage tables-modal-body--rooms-manage">
+              <p className="tables-rooms-manage-intro muted">
+                La salle principale ne peut pas être supprimée. Si tu supprimes une autre salle, ses tables sont
+                déplacées vers la salle principale.
+              </p>
+              <ul className="tables-rooms-manage-list">
+                {[...rooms]
+                  .sort(
+                    (a, b) =>
+                      Number(b.isDefault) - Number(a.isDefault) ||
+                      a.name.localeCompare(b.name, "fr", { numeric: true, sensitivity: "base" })
+                  )
+                  .map((r) => {
+                    const draft = roomDraftNames[r.id] ?? r.name;
+                    const dirty = draft.trim() !== r.name;
+                    return (
+                      <li key={r.id} className="tables-rooms-manage-card">
+                        <div className="tables-rooms-manage-card-top">
+                          <div className="tables-rooms-manage-card-meta">
+                            <span className="tables-rooms-manage-card-badge">
+                              {r.isDefault ? "Salle principale" : "Salle"}
+                            </span>
+                            {r.isDefault ? (
+                              <span className="tables-rooms-manage-card-note muted">Non supprimable</span>
+                            ) : null}
+                          </div>
+                          <div className="tables-rooms-manage-card-actions">
+                            <button
+                              type="button"
+                              className="tables-rooms-manage-btn-save"
+                              disabled={!dirty || roomActionBusyId !== null}
+                              onClick={() => void saveRoomDraft(r.id)}
+                            >
+                              {roomActionBusyId === r.id ? "Enregistrement…" : "Enregistrer"}
+                            </button>
+                            {!r.isDefault ? (
+                              <button
+                                type="button"
+                                className="tables-rooms-manage-btn-delete"
+                                disabled={roomActionBusyId !== null}
+                                onClick={() => void deleteRoom(r)}
+                              >
+                                Supprimer
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                        <label className="tables-rooms-manage-field-label" htmlFor={`tables-room-name-${r.id}`}>
+                          Nom affiché
+                        </label>
+                        <input
+                          id={`tables-room-name-${r.id}`}
+                          className="tables-manage-input tables-rooms-manage-input"
+                          value={draft}
+                          onChange={(e) => {
+                            setRoomDraftNames((prev) => ({ ...prev, [r.id]: e.target.value }));
+                            setRoomsManageError(null);
+                          }}
+                          disabled={roomActionBusyId !== null}
+                          autoComplete="off"
+                        />
+                      </li>
+                    );
+                  })}
+              </ul>
+              {roomsManageError ? (
+                <p className="tables-manage-error" role="alert">
+                  {roomsManageError}
+                </p>
+              ) : null}
+              <div className="tables-rooms-manage-footer">
+                <button type="button" className="tables-manage-btn-cancel" onClick={closeRoomsManageModal}>
+                  Fermer
+                </button>
               </div>
             </div>
           </div>

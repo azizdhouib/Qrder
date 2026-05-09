@@ -47,8 +47,20 @@ async function main() {
     }
   });
 
+  const defaultRoom = await db.floorRoom.upsert({
+    where: {
+      restaurantId_name: { restaurantId: restaurant.id, name: "Salle 1" }
+    },
+    update: { isDefault: true },
+    create: {
+      name: "Salle 1",
+      restaurantId: restaurant.id,
+      isDefault: true
+    }
+  });
+
   const table = await db.table.create({
-    data: { name: "T1", qrToken: randomUUID(), restaurantId: restaurant.id }
+    data: { name: "T1", qrToken: randomUUID(), restaurantId: restaurant.id, roomId: defaultRoom.id }
   });
 
   const cat = await db.menuCategory.create({

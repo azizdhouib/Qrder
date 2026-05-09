@@ -186,6 +186,13 @@ export function createAdminRouter(): Router {
             suspended: false
           }
         });
+        await tx.floorRoom.create({
+          data: {
+            name: "Salle 1",
+            restaurantId: restaurant.id,
+            isDefault: true
+          }
+        });
         const user = await tx.user.create({
           data: {
             email,

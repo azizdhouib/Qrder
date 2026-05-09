@@ -419,8 +419,8 @@ a {
 
 /* Boutons dashboard / pages avec <main> classique uniquement — exclut menu client (main.client-public-menu) */
 /* Exclut aussi les contrôles « Ma carte » (.menu-config-*) pour ne pas écraser onglets / icônes */
-main:not(.client-public-menu) button:not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm),
-.dashboard-app-shell button:not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm) {
+main:not(.client-public-menu) button:not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab),
+.dashboard-app-shell button:not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab) {
   border: none;
   border-radius: 999px;
   padding: 0.62rem 1.35rem;
@@ -436,13 +436,13 @@ main:not(.client-public-menu) button:not(.menu-config-tab):not(.menu-config-icon
   box-shadow: var(--shadow-a);
 }
 
-main:not(.client-public-menu) button:hover:not(.btn-secondary):not(.btn-danger):not(.menu-tab):not(.btn-primary-ios):not(.btn-outline-primary):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(:disabled),
-.dashboard-app-shell button:hover:not(.btn-secondary):not(.btn-danger):not(.menu-tab):not(.btn-primary-ios):not(.btn-outline-primary):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(:disabled) {
+main:not(.client-public-menu) button:hover:not(.btn-secondary):not(.btn-danger):not(.menu-tab):not(.btn-primary-ios):not(.btn-outline-primary):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab):not(:disabled),
+.dashboard-app-shell button:hover:not(.btn-secondary):not(.btn-danger):not(.menu-tab):not(.btn-primary-ios):not(.btn-outline-primary):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab):not(:disabled) {
   box-shadow: var(--shadow-a), 0 6px 18px oklch(0.2 0.02 270 / 0.12);
 }
 
-main:not(.client-public-menu) button:hover:not(:disabled):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm),
-.dashboard-app-shell button:hover:not(:disabled):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm) {
+main:not(.client-public-menu) button:hover:not(:disabled):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab),
+.dashboard-app-shell button:hover:not(:disabled):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab) {
   transform: translateY(-1px);
 }
 
@@ -4051,15 +4051,9 @@ html[data-theme="dark"] .menu-tab:hover {
 
 .tables-pilot-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   align-items: start;
-}
-
-@media (max-width: 1024px) {
-  .tables-pilot-body {
-    grid-template-columns: 1fr;
-  }
 }
 
 .tables-pilot-plan-card {
@@ -4070,12 +4064,373 @@ html[data-theme="dark"] .menu-tab:hover {
 
 .tables-pilot-plan-head {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.65rem 1rem;
+  flex-direction: column;
+  gap: 0.75rem;
   margin-bottom: 1rem;
   padding-bottom: 0.85rem;
   border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 25%);
+}
+
+.tables-pilot-plan-head-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  width: 100%;
+}
+
+.tables-pilot-plan-title-block {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.85rem;
+  min-width: 0;
+}
+
+.tables-floor-room-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.2rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dashboard-app-shell .tables-floor-room-tab {
+  min-height: 2.15rem !important;
+  padding: 0.38rem 0.95rem !important;
+  border-radius: 999px !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+  background: transparent !important;
+  color: var(--muted-foreground) !important;
+  border: none !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  transition: color 0.12s ease, background 0.12s ease, filter 0.12s ease !important;
+}
+
+.dashboard-app-shell .tables-floor-room-tab:hover:not(.tables-floor-room-tab--active):not(:disabled) {
+  color: var(--foreground) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.dashboard-app-shell .tables-floor-room-tab--active {
+  background: var(--foreground) !important;
+  color: var(--background) !important;
+}
+
+.dashboard-app-shell .tables-floor-room-tab--active:hover:not(:disabled) {
+  filter: brightness(0.96);
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.dashboard-app-shell .tables-floor-room-tab:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--ring), transparent 15%) !important;
+  outline-offset: 2px !important;
+}
+
+.tables-pilot-room-select {
+  min-width: min(100%, 11rem);
+  max-width: 16rem;
+  padding: 0.42rem 0.65rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: 0.55rem;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 8%);
+  background: var(--background);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.tables-pilot-room-select:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--primary), transparent 35%);
+  outline-offset: 2px;
+}
+
+.tables-pilot-plan-scale-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  align-items: flex-end;
+  width: 100%;
+}
+
+.tables-pilot-scale-field {
+  flex: 1 1 11rem;
+  min-width: min(100%, 12rem);
+}
+
+.tables-pilot-scale-field > label {
+  display: block;
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.tables-pilot-scale-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.tables-pilot-range {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: var(--primary);
+}
+
+.tables-pilot-scale-value {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--foreground);
+  min-width: 3.35rem;
+  text-align: right;
+}
+
+.tables-pilot-room-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.55rem;
+  margin: 0 0 0.85rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.75rem;
+  background: color-mix(in oklch, var(--primary), transparent 94%);
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 78%);
+}
+
+.tables-pilot-room-bar--edit-links {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tables-pilot-room-bar--edit-links .tables-pilot-room-add-link {
+  margin-inline-start: 0;
+}
+
+.tables-pilot-room-bar-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-right: 0.25rem;
+}
+
+.dashboard-app-shell .tables-pilot-room-chip {
+  min-height: 2rem !important;
+  padding: 0 0.75rem !important;
+  border-radius: 999px !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  background: var(--background) !important;
+  color: var(--foreground) !important;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 10%) !important;
+  box-shadow: none !important;
+}
+
+.dashboard-app-shell .tables-pilot-room-chip:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--secondary), transparent 35%) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.dashboard-app-shell .tables-pilot-room-chip--active {
+  background: color-mix(in oklch, var(--primary), transparent 82%) !important;
+  border-color: color-mix(in oklch, var(--primary), transparent 45%) !important;
+}
+
+.tables-pilot-room-add-link {
+  margin-inline-start: auto;
+}
+
+.dashboard-app-shell .tables-add-room-btn-cancel {
+  min-height: 2.55rem !important;
+  padding: 0 1.1rem !important;
+  border-radius: 0.65rem !important;
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  background: transparent !important;
+  color: var(--foreground) !important;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 8%) !important;
+  box-shadow: none !important;
+}
+
+.dashboard-app-shell .tables-add-room-btn-cancel:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--secondary), transparent 30%) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.dashboard-app-shell .tables-add-room-btn-save {
+  min-height: 2.55rem !important;
+  padding: 0 1.25rem !important;
+  border-radius: 0.65rem !important;
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  border: none !important;
+  box-shadow: 0 1px 2px color-mix(in oklch, var(--primary), transparent 55%) !important;
+}
+
+.dashboard-app-shell .tables-add-room-btn-save:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: none !important;
+  box-shadow: 0 2px 10px color-mix(in oklch, var(--primary), transparent 40%) !important;
+}
+
+.tables-modal-panel--rooms-manage {
+  width: min(100%, 26.5rem);
+}
+
+.tables-modal-head--rooms-manage {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 30%);
+}
+
+.tables-modal-body--rooms-manage {
+  gap: 0;
+}
+
+.tables-rooms-manage-intro {
+  margin: 0 0 1.1rem;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  border-radius: 0.75rem;
+  background: color-mix(in oklch, var(--secondary), transparent 45%);
+  border: 1px solid color-mix(in oklch, var(--border), transparent 20%);
+}
+
+.tables-rooms-manage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.tables-rooms-manage-card {
+  margin: 0;
+  padding: 1rem 1.05rem;
+  border-radius: 0.9rem;
+  background: color-mix(in oklch, var(--card), transparent 12%);
+  border: 1px solid color-mix(in oklch, var(--border), transparent 18%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tables-rooms-manage-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem 0.75rem;
+}
+
+.tables-rooms-manage-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.6rem;
+  min-width: 0;
+}
+
+.tables-rooms-manage-card-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.tables-rooms-manage-card-note {
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.tables-rooms-manage-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+.tables-rooms-manage-field-label {
+  display: block;
+  margin: 0.15rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.tables-rooms-manage-input {
+  width: 100%;
+}
+
+.dashboard-app-shell .tables-rooms-manage-btn-save {
+  min-height: 2.4rem !important;
+  padding: 0 1.05rem !important;
+  border-radius: 0.6rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  border: none !important;
+  box-shadow: 0 1px 0 color-mix(in oklch, var(--primary), transparent 40%) !important;
+}
+
+.dashboard-app-shell .tables-rooms-manage-btn-save:disabled {
+  opacity: 0.42 !important;
+  cursor: not-allowed !important;
+  filter: none !important;
+}
+
+.dashboard-app-shell .tables-rooms-manage-btn-save:hover:not(:disabled) {
+  filter: brightness(1.07);
+  transform: none !important;
+}
+
+.dashboard-app-shell .tables-rooms-manage-btn-delete {
+  min-height: 2.4rem !important;
+  padding: 0 1rem !important;
+  border-radius: 0.6rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  background: transparent !important;
+  color: oklch(0.52 0.19 25) !important;
+  border: 1px solid color-mix(in oklch, oklch(0.52 0.19 25), transparent 45%) !important;
+  box-shadow: none !important;
+}
+
+.dashboard-app-shell .tables-rooms-manage-btn-delete:hover:not(:disabled) {
+  background: color-mix(in oklch, oklch(0.52 0.19 25), transparent 92%) !important;
+  transform: none !important;
+}
+
+.tables-rooms-manage-footer {
+  display: flex;
+  justify-content: center;
+  padding-top: 1.15rem;
+  margin-top: 0.35rem;
+  border-top: 1px solid color-mix(in oklch, var(--border), transparent 35%);
+}
+
+.tables-rooms-manage-footer .tables-manage-btn-cancel {
+  align-self: center;
+  min-width: 8.5rem;
+}
+
+.tables-floor-zoom-host {
+  width: 100%;
 }
 
 .tables-pilot-plan-title {
@@ -4315,12 +4670,20 @@ html[data-theme="dark"] .menu-tab:hover {
 }
 
 .tables-manage-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   margin: 0 0 0.2rem;
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted-foreground);
+}
+
+.tables-manage-eyebrow-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
 }
 
 .tables-modal-head--manage .tables-modal-title {
@@ -4370,6 +4733,11 @@ html[data-theme="dark"] .menu-tab:hover {
 .tables-manage-input:focus {
   border-color: color-mix(in oklch, var(--primary), transparent 15%);
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary), transparent 82%);
+}
+
+select.tables-manage-select {
+  cursor: pointer;
+  appearance: auto;
 }
 
 .tables-manage-error {
@@ -4584,12 +4952,31 @@ html[data-theme="dark"] .menu-tab:hover {
 }
 
 .tables-floor-canvas .tables-floor-cell {
+  --tables-floor-s: var(--tables-floor-card-scale, 1);
   position: absolute;
-  width: min(7.75rem, 32vw);
-  min-height: 5.15rem;
+  box-sizing: border-box;
+  width: calc(min(7.75rem, 32vw) * var(--tables-floor-s));
+  height: calc(min(7.75rem, 32vw) * var(--tables-floor-s));
+  min-height: unset;
+  max-height: none;
   margin: 0;
+  padding: calc(0.45rem * var(--tables-floor-s)) calc(0.4rem * var(--tables-floor-s));
+  gap: calc(0.2rem * var(--tables-floor-s));
+  border-radius: calc(0.85rem * min(1.15, var(--tables-floor-s)));
   transform: translate(-50%, -50%);
   z-index: 1;
+}
+
+.tables-floor-canvas .tables-floor-cell-main {
+  gap: calc(0.12rem * var(--tables-floor-s));
+}
+
+.tables-floor-canvas .tables-floor-name {
+  font-size: clamp(0.68rem, calc(0.92rem * var(--tables-floor-s)), 1.35rem);
+}
+
+.tables-floor-canvas .tables-floor-state {
+  font-size: clamp(0.45rem, calc(0.58rem * var(--tables-floor-s)), 0.75rem);
 }
 
 .tables-floor-canvas--edit .tables-floor-cell[role="button"] {

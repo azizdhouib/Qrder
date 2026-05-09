@@ -35,6 +35,7 @@ model Restaurant {
   createdAt  DateTime       @default(now())
   users      User[]
   tables     Table[]
+  floorRooms FloorRoom[]
   categories MenuCategory[]
   items      MenuItem[]
   orders     Order[]
@@ -64,6 +65,21 @@ model PlatformAdmin {
   @@map("qr_platform_admins")
 }
 
+/// Zone logique du plan (ex. Salle, Terrasse) — pour filtrer et classer les tables.
+model FloorRoom {
+  id             String     @id @default(cuid())
+  name           String
+  /// Salle principale du restaurant (une seule) — créée à l’ouverture du compte, non supprimable.
+  isDefault      Boolean    @default(false)
+  restaurantId   String
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tables         Table[]
+  createdAt      DateTime   @default(now())
+
+  @@unique([restaurantId, name])
+  @@map("qr_floor_rooms")
+}
+
 model Table {
   id           String     @id @default(cuid())
   name         String
@@ -73,6 +89,8 @@ model Table {
   planPosXPct Float?
   /// Position verticale sur le plan de salle (0–100 % du cadre, centre de la pastille).
   planPosYPct Float?
+  roomId       String?
+  room         FloorRoom? @relation(fields: [roomId], references: [id], onDelete: SetNull)
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   orders       Order[]

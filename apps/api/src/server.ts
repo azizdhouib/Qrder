@@ -239,15 +239,37 @@ app.get("/me/restaurant", authRequired, async (req, res) => {
 });
 
 app.post("/tables", authRequired, staffOnly, async (req, res) => {
-  const body = z.object({ name: z.string().min(1) }).safeParse(req.body);
+  const body = z
+    .object({
+      name: z.string().min(1),
+      roomId: z.string().cuid().optional()
+    })
+    .safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Invalid payload" });
 
   const name = body.data.name.trim();
   if (!name) return res.status(400).json({ message: "Invalid payload" });
 
+  const restaurantId = req.user!.restaurantId;
+  let roomId = body.data.roomId ?? null;
+  if (roomId) {
+    const roomOk = await db.floorRoom.findFirst({
+      where: { id: roomId, restaurantId }
+    });
+    if (!roomOk) return res.status(400).json({ message: "Salle introuvable." });
+  } else {
+    const def = await db.floorRoom.findFirst({
+      where: { restaurantId, isDefault: true }
+    });
+    if (!def) {
+      return res.status(400).json({ message: "Aucune salle par défaut. Contacte le support." });
+    }
+    roomId = def.id;
+  }
+
   const dup = await db.table.findFirst({
     where: {
-      restaurantId: req.user!.restaurantId,
+      restaurantId,
       name: { equals: name, mode: "insensitive" }
     }
   });
@@ -257,7 +279,8 @@ app.post("/tables", authRequired, staffOnly, async (req, res) => {
     data: {
       name,
       qrToken: randomUUID(),
-      restaurantId: req.user!.restaurantId
+      restaurantId,
+      roomId
     }
   });
 
@@ -270,6 +293,84 @@ app.get("/tables", authRequired, staffOnly, async (req, res) => {
     orderBy: { name: "asc" }
   });
   res.json(tables);
+});
+
+app.get("/floor-rooms", authRequired, staffOnly, async (req, res) => {
+  const rooms = await db.floorRoom.findMany({
+    where: { restaurantId: req.user!.restaurantId },
+    orderBy: [{ isDefault: "desc" }, { name: "asc" }]
+  });
+  res.json(rooms);
+});
+
+app.post("/floor-rooms", authRequired, staffOnly, async (req, res) => {
+  const body = z.object({ name: z.string().min(1) }).safeParse(req.body);
+  if (!body.success) return res.status(400).json({ message: "Invalid payload" });
+  const name = body.data.name.trim();
+  if (!name) return res.status(400).json({ message: "Invalid payload" });
+  const dup = await db.floorRoom.findFirst({
+    where: {
+      restaurantId: req.user!.restaurantId,
+      name: { equals: name, mode: "insensitive" }
+    }
+  });
+  if (dup) return res.status(409).json({ message: "Une salle avec ce nom existe déjà." });
+  const room = await db.floorRoom.create({
+    data: { name, restaurantId: req.user!.restaurantId, isDefault: false }
+  });
+  res.status(201).json(room);
+});
+
+app.patch("/floor-rooms/:id", authRequired, staffOnly, async (req, res) => {
+  const roomId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const body = z.object({ name: z.string().min(1) }).safeParse(req.body);
+  if (!body.success) return res.status(400).json({ message: "Invalid payload" });
+  const name = body.data.name.trim();
+  if (!name) return res.status(400).json({ message: "Invalid payload" });
+
+  const existing = await db.floorRoom.findFirst({
+    where: { id: roomId, restaurantId: req.user!.restaurantId }
+  });
+  if (!existing) return res.status(404).json({ message: "Room not found" });
+
+  const dup = await db.floorRoom.findFirst({
+    where: {
+      restaurantId: req.user!.restaurantId,
+      name: { equals: name, mode: "insensitive" },
+      NOT: { id: roomId }
+    }
+  });
+  if (dup) return res.status(409).json({ message: "Une salle avec ce nom existe déjà." });
+
+  const updated = await db.floorRoom.update({
+    where: { id: roomId },
+    data: { name }
+  });
+  res.json(updated);
+});
+
+app.delete("/floor-rooms/:id", authRequired, staffOnly, async (req, res) => {
+  const roomId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const restaurantId = req.user!.restaurantId;
+  const existing = await db.floorRoom.findFirst({
+    where: { id: roomId, restaurantId }
+  });
+  if (!existing) return res.status(404).json({ message: "Room not found" });
+  if (existing.isDefault) {
+    return res.status(403).json({
+      message: "La salle principale ne peut pas être supprimée."
+    });
+  }
+  const def = await db.floorRoom.findFirst({
+    where: { restaurantId, isDefault: true, NOT: { id: roomId } }
+  });
+  const fallbackRoomId = def?.id ?? null;
+  await db.table.updateMany({
+    where: { roomId, restaurantId },
+    data: { roomId: fallbackRoomId }
+  });
+  await db.floorRoom.delete({ where: { id: roomId } });
+  res.status(204).send();
 });
 
 /** Nouveau jeton QR pour chaque table — les anciens liens / QR imprimés ne fonctionnent plus. */
@@ -303,17 +404,19 @@ app.patch("/tables/:id", authRequired, staffOnly, async (req, res) => {
     .object({
       name: z.string().min(1).optional(),
       planPosXPct: z.number().min(0).max(100).optional(),
-      planPosYPct: z.number().min(0).max(100).optional()
+      planPosYPct: z.number().min(0).max(100).optional(),
+      roomId: z.union([z.string().cuid(), z.null()]).optional()
     })
     .strict()
     .safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Invalid payload" });
 
-  const { name: nameRaw, planPosXPct, planPosYPct } = body.data;
+  const { name: nameRaw, planPosXPct, planPosYPct, roomId: roomIdRaw } = body.data;
   const hasName = nameRaw !== undefined;
   const hasPlanX = planPosXPct !== undefined;
   const hasPlanY = planPosYPct !== undefined;
-  if (!hasName && !hasPlanX && !hasPlanY) {
+  const hasRoomId = roomIdRaw !== undefined;
+  if (!hasName && !hasPlanX && !hasPlanY && !hasRoomId) {
     return res.status(400).json({ message: "Invalid payload" });
   }
   if ((hasPlanX && !hasPlanY) || (!hasPlanX && hasPlanY)) {
@@ -324,6 +427,24 @@ app.patch("/tables/:id", authRequired, staffOnly, async (req, res) => {
     where: { id: tableId, restaurantId: req.user!.restaurantId }
   });
   if (!existing) return res.status(404).json({ message: "Table not found" });
+
+  let roomIdToSet: string | undefined;
+  if (hasRoomId) {
+    const restaurantId = req.user!.restaurantId;
+    if (roomIdRaw === null) {
+      const def = await db.floorRoom.findFirst({
+        where: { restaurantId, isDefault: true }
+      });
+      if (!def) return res.status(400).json({ message: "Aucune salle par défaut." });
+      roomIdToSet = def.id;
+    } else {
+      const roomOk = await db.floorRoom.findFirst({
+        where: { id: roomIdRaw, restaurantId }
+      });
+      if (!roomOk) return res.status(400).json({ message: "Salle introuvable." });
+      roomIdToSet = roomIdRaw;
+    }
+  }
 
   if (hasName) {
     const name = nameRaw.trim();
@@ -343,7 +464,8 @@ app.patch("/tables/:id", authRequired, staffOnly, async (req, res) => {
     where: { id: tableId },
     data: {
       ...(hasName ? { name: nameRaw!.trim() } : {}),
-      ...(hasPlanX && hasPlanY ? { planPosXPct, planPosYPct } : {})
+      ...(hasPlanX && hasPlanY ? { planPosXPct, planPosYPct } : {}),
+      ...(hasRoomId && roomIdToSet !== undefined ? { roomId: roomIdToSet } : {})
     }
   });
   res.json(updated);
