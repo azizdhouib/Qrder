@@ -69,6 +69,10 @@ model Table {
   name         String
   qrToken      String
   isActive     Boolean    @default(true)
+  /// Position horizontale sur le plan de salle (0–100 % du cadre, centre de la pastille).
+  planPosXPct Float?
+  /// Position verticale sur le plan de salle (0–100 % du cadre, centre de la pastille).
+  planPosYPct Float?
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   orders       Order[]

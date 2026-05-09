@@ -242,9 +242,20 @@ app.post("/tables", authRequired, staffOnly, async (req, res) => {
   const body = z.object({ name: z.string().min(1) }).safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Invalid payload" });
 
+  const name = body.data.name.trim();
+  if (!name) return res.status(400).json({ message: "Invalid payload" });
+
+  const dup = await db.table.findFirst({
+    where: {
+      restaurantId: req.user!.restaurantId,
+      name: { equals: name, mode: "insensitive" }
+    }
+  });
+  if (dup) return res.status(409).json({ message: "Une table avec ce nom existe déjà." });
+
   const table = await db.table.create({
     data: {
-      name: body.data.name,
+      name,
       qrToken: randomUUID(),
       restaurantId: req.user!.restaurantId
     }
@@ -259,6 +270,101 @@ app.get("/tables", authRequired, staffOnly, async (req, res) => {
     orderBy: { name: "asc" }
   });
   res.json(tables);
+});
+
+/** Nouveau jeton QR pour chaque table — les anciens liens / QR imprimés ne fonctionnent plus. */
+app.post("/tables/regenerate-qr-tokens", authRequired, staffOnly, async (req, res) => {
+  const restaurantId = req.user!.restaurantId;
+  const rows = await db.table.findMany({
+    where: { restaurantId },
+    select: { id: true }
+  });
+  if (rows.length === 0) {
+    return res.json([]);
+  }
+  await db.$transaction(
+    rows.map((row) =>
+      db.table.update({
+        where: { id: row.id },
+        data: { qrToken: randomUUID() }
+      })
+    )
+  );
+  const tables = await db.table.findMany({
+    where: { restaurantId },
+    orderBy: { name: "asc" }
+  });
+  res.json(tables);
+});
+
+app.patch("/tables/:id", authRequired, staffOnly, async (req, res) => {
+  const tableId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const body = z
+    .object({
+      name: z.string().min(1).optional(),
+      planPosXPct: z.number().min(0).max(100).optional(),
+      planPosYPct: z.number().min(0).max(100).optional()
+    })
+    .strict()
+    .safeParse(req.body);
+  if (!body.success) return res.status(400).json({ message: "Invalid payload" });
+
+  const { name: nameRaw, planPosXPct, planPosYPct } = body.data;
+  const hasName = nameRaw !== undefined;
+  const hasPlanX = planPosXPct !== undefined;
+  const hasPlanY = planPosYPct !== undefined;
+  if (!hasName && !hasPlanX && !hasPlanY) {
+    return res.status(400).json({ message: "Invalid payload" });
+  }
+  if ((hasPlanX && !hasPlanY) || (!hasPlanX && hasPlanY)) {
+    return res.status(400).json({ message: "planPosXPct et planPosYPct sont requis ensemble." });
+  }
+
+  const existing = await db.table.findFirst({
+    where: { id: tableId, restaurantId: req.user!.restaurantId }
+  });
+  if (!existing) return res.status(404).json({ message: "Table not found" });
+
+  if (hasName) {
+    const name = nameRaw.trim();
+    if (!name) return res.status(400).json({ message: "Invalid payload" });
+
+    const dup = await db.table.findFirst({
+      where: {
+        restaurantId: req.user!.restaurantId,
+        name: { equals: name, mode: "insensitive" },
+        NOT: { id: tableId }
+      }
+    });
+    if (dup) return res.status(409).json({ message: "Une table avec ce nom existe déjà." });
+  }
+
+  const updated = await db.table.update({
+    where: { id: tableId },
+    data: {
+      ...(hasName ? { name: nameRaw!.trim() } : {}),
+      ...(hasPlanX && hasPlanY ? { planPosXPct, planPosYPct } : {})
+    }
+  });
+  res.json(updated);
+});
+
+app.delete("/tables/:id", authRequired, staffOnly, async (req, res) => {
+  const tableId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+
+  const existing = await db.table.findFirst({
+    where: { id: tableId, restaurantId: req.user!.restaurantId },
+    include: { _count: { select: { orders: true } } }
+  });
+  if (!existing) return res.status(404).json({ message: "Table not found" });
+  if (existing._count.orders > 0) {
+    return res.status(409).json({
+      message: "Impossible de supprimer cette table : des commandes y sont liées."
+    });
+  }
+
+  await db.table.delete({ where: { id: tableId } });
+  res.status(204).send();
 });
 
 app.get("/tables/:id/qr", authRequired, staffOnly, async (req, res) => {
