@@ -1807,6 +1807,11 @@ textarea:focus {
   box-shadow: var(--shadow-a);
 }
 
+/* Ne pas utiliser contain:paint du .panel : sur iPad / colonnes fines les heures « Depuis » étaient rognées. */
+.kds-ticket.panel {
+  contain: layout;
+}
+
 .kds-ticket--wait-ok {
   border-left-color: color-mix(in srgb, var(--status-ready-dot) 55%, var(--border));
 }
@@ -1848,7 +1853,7 @@ textarea:focus {
 .kds-time-row--depuis .kds-time-value {
   white-space: nowrap;
   flex-shrink: 0;
-  min-width: 0;
+  min-width: max-content;
 }
 
 .kds-ticket-top {
@@ -1899,6 +1904,15 @@ textarea:focus {
   border-radius: 0.65rem;
   background: color-mix(in srgb, var(--foreground) 5%, transparent);
   border: 1px solid var(--border);
+}
+
+/* État « ok » : fond lisible + chiffres toujours contrastés (Safari / mélanges srgb + transparent). */
+.kds-ticket-times--ok {
+  background: color-mix(in oklch, var(--foreground) 9%, var(--card));
+}
+
+.kds-ticket-times--ok .kds-time-value {
+  color: var(--foreground);
 }
 
 .kds-ticket-times--attention {
@@ -2025,6 +2039,14 @@ textarea:focus {
   background: color-mix(in srgb, var(--status-ready-dot) 32%, var(--card));
   border-color: color-mix(in srgb, var(--status-ready-dot) 58%, transparent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--status-ready-dot) 28%, transparent);
+}
+
+/* Lignes validées en préparation : même aspect vert en Prêtes / Servies (lecture seule). */
+.dashboard-app-shell .kds-ticket .kds-line-static.kds-line--done {
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.55rem;
+  background: color-mix(in srgb, var(--status-ready-dot) 20%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--status-ready-dot) 42%, transparent);
 }
 
 .dashboard-app-shell .kds-ticket button.kds-line:focus-visible {

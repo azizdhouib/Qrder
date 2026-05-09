@@ -721,8 +721,9 @@ function KdsTicketCard({
     setDoneLineIds(new Set());
   }, [itemIdsKey]);
 
+  /** Repasse en « Nouvelles » : on efface les coches. En Prêtes / Servies on garde le vert des lignes validées en cuisine. */
   useEffect(() => {
-    if (order.status !== "PREPARING") setDoneLineIds(new Set());
+    if (order.status === "PLACED") setDoneLineIds(new Set());
   }, [order.status]);
 
   function toggleLineItem(itemId: string) {
@@ -787,7 +788,10 @@ function KdsTicketCard({
 
       <ul className="kds-lines">
         {order.items.map((item) => {
-          const lineDone = linePickMode && doneLineIds.has(item.id);
+          const lineDoneVisual =
+            doneLineIds.has(item.id) &&
+            (order.status === "PREPARING" || order.status === "READY" || order.status === "SERVED");
+          const lineDone = linePickMode && lineDoneVisual;
           const lineLabel = `${item.quantity}× ${item.nameSnapshot}`;
           const inner = (
             <>
@@ -817,7 +821,7 @@ function KdsTicketCard({
                   {inner}
                 </button>
               ) : (
-                <div className="kds-line-static">{inner}</div>
+                <div className={`kds-line-static${lineDoneVisual ? " kds-line--done" : ""}`}>{inner}</div>
               )}
             </li>
           );
