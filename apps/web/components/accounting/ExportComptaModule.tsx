@@ -72,6 +72,9 @@ type VatReportResponse = {
 };
 
 type DailyCloseResponse = {
+  from: string;
+  to: string;
+  computedAt: string;
   restaurantName: string;
   chiffreAffairesFactureCents: number;
   nombreCommandesCommerce: number;
@@ -169,7 +172,7 @@ export function ExportComptaModule({ token }: { token: string }) {
 
   const qs = useMemo(
     () => `?from=${encodeURIComponent(range.from.toISOString())}&to=${encodeURIComponent(range.to.toISOString())}`,
-    [range.from, range.to]
+    [preset, range.from.getTime(), range.to.getTime()]
   );
 
   useEffect(() => {
@@ -353,11 +356,14 @@ export function ExportComptaModule({ token }: { token: string }) {
     if (tab === "dashboard") void loadDash().catch(console.error);
     if (tab === "sales") void loadSales().catch(console.error);
     if (tab === "vat") void loadVat().catch(console.error);
-    if (tab === "close") void loadClose().catch(console.error);
+    if (tab === "close") {
+      setClose(null);
+      void loadClose().catch(console.error);
+    }
     if (tab === "bills") void loadBills().catch(console.error);
     if (tab === "payments") void loadPay().catch(console.error);
     if (tab === "audit") void loadAudit().catch(console.error);
-  }, [tab, loadDash, loadSales, loadVat, loadClose, loadBills, loadPay, loadAudit]);
+  }, [tab, preset, qs, loadDash, loadSales, loadVat, loadClose, loadBills, loadPay, loadAudit]);
 
   const hourlyChartData = useMemo(() => {
     if (!dash?.hourlyOrders) return [];
@@ -784,7 +790,14 @@ export function ExportComptaModule({ token }: { token: string }) {
                   >
                     Export CSV
                   </button>
-                  <button type="button" className="btn-secondary" onClick={() => window.print()}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    title="Imprime le contenu de la page (onglet Clôture). Enregistrez en PDF depuis la boîte d’impression si besoin."
+                    onClick={() => {
+                      window.requestAnimationFrame(() => window.print());
+                    }}
+                  >
                     Imprimer (aperçu)
                   </button>
                 </div>
@@ -807,9 +820,13 @@ export function ExportComptaModule({ token }: { token: string }) {
                   <p className="compta-kpi-value">{close.heuresForteActivite.peakHourLabel}</p>
                 </article>
               </div>
-              <p className="acc-muted-note">
-                Astuce : pour une vraie clôture journalière, choisis « Aujourd’hui » ou une période personnalisée sur une
-                seule journée.
+              <p className="acc-muted-note" style={{ marginTop: "0.5rem" }}>
+                <strong>Période interrogée</strong> (réponse API) :{" "}
+                {new Date(close.from).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })} —{" "}
+                {new Date(close.to).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}. Le CA facturé
+                additionne les factures dont la date de création tombe dans cet intervalle. Si tout a été encaissé le
+                même jour, « Aujourd’hui », « Cette semaine » et « Ce mois » peuvent afficher le même montant. Pour une
+                clôture journalière stricte, utilise « Aujourd’hui » ou « Personnalisée » sur une seule journée.
               </p>
             </>
           )}

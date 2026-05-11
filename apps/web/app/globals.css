@@ -3860,14 +3860,42 @@ textarea:focus {
   }
 
   .dashboard-app-shell .dashboard-top-bar,
-  .dashboard-app-shell .dashboard-main-content > *:not(.invoice-page) {
+  /* Impression : seule la facture était prévue au départ ; inclure compta / export compta sinon page blanche. */
+  .dashboard-app-shell .dashboard-main-content > *:not(.invoice-page):not(.export-compta-page):not(.compta-page) {
     display: none !important;
   }
 
   .dashboard-main-content .invoice-page,
-  .dashboard-main-content .invoice-page--dashboard {
+  .dashboard-main-content .invoice-page--dashboard,
+  .dashboard-main-content .export-compta-page,
+  .dashboard-main-content .compta-page {
     max-width: none;
     padding: 0;
+  }
+
+  /* Rapports compta : fond clair à l’impression / PDF navigateur */
+  .export-compta-page,
+  .compta-page {
+    background: #fff !important;
+    color: #111 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .export-compta-page .acc-main-tabs,
+  .export-compta-page .acc-period-row,
+  .export-compta-page .acc-actions-row,
+  .export-compta-page .acc-chart-wrap {
+    display: none !important;
+  }
+
+  .export-compta-page .panel,
+  .export-compta-page .compta-bills,
+  .export-compta-page .compta-kpi {
+    background: #f4f4f6 !important;
+    color: #111 !important;
+    border: 1px solid #ddd !important;
+    box-shadow: none !important;
   }
 
   .invoice-preview-wrap {
