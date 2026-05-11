@@ -14,6 +14,7 @@ const NAV_FULL: DashboardNavItem[] = [
   { href: "/dashboard/tables", label: "Tables + QR" },
   { href: "/dashboard/menu", label: "Menu" },
   { href: "/dashboard/kitchen", label: "Écran cuisine" },
+  { href: "/dashboard/compta", label: "Compta" },
   { href: "/dashboard/history", label: "Historique" }
 ];
 

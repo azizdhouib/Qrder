@@ -1,13 +1,13 @@
 import "./loadEnvFirst.js";
 import http from "node:http";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import cors from "cors";
 import express from "express";
 import QRCode from "qrcode";
 import { Server } from "socket.io";
 import type { Prisma } from "@prisma/client";
-import { OrderStatus, UserRole } from "@prisma/client";
+import { OrderStatus, PaymentMethod, RestaurantVatMode, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { authRequired, requireRoles, signAuthToken } from "./auth.js";
 import { createAdminRouter } from "./adminRoutes.js";
@@ -47,6 +47,10 @@ function slugify(value: string) {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
+}
+
+function uniquePaymentReference(): string {
+  return randomBytes(10).toString("hex").toUpperCase().slice(0, 20);
 }
 
 const MENU_ITEM_MAX_TAGS = 12;
@@ -236,6 +240,49 @@ app.get("/me/restaurant", authRequired, async (req, res) => {
     where: { id: req.user!.restaurantId }
   });
   res.json(restaurant);
+});
+
+const invoiceProfilePatchSchema = z.object({
+  legalName: z.string().max(200).nullable().optional(),
+  addressLine1: z.string().max(200).nullable().optional(),
+  addressLine2: z.string().max(200).nullable().optional(),
+  postalCode: z.string().max(32).nullable().optional(),
+  city: z.string().max(120).nullable().optional(),
+  country: z.string().max(8).nullable().optional(),
+  phone: z.string().max(40).nullable().optional(),
+  billingEmail: z.string().email().max(200).nullable().optional(),
+  siret: z.string().max(20).nullable().optional(),
+  vatNumber: z.string().max(40).nullable().optional(),
+  logoUrl: z.string().max(2000).nullable().optional(),
+  invoiceFooterLegal: z.string().max(4000).nullable().optional(),
+  vatMode: z.nativeEnum(RestaurantVatMode).optional()
+});
+
+app.patch("/me/restaurant/invoice-profile", authRequired, staffOnly, async (req, res) => {
+  const parsed = invoiceProfilePatchSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: "Payload invalide", issues: parsed.error.issues });
+  }
+  const data = parsed.data;
+  const updated = await db.restaurant.update({
+    where: { id: req.user!.restaurantId },
+    data: {
+      ...(data.legalName !== undefined ? { legalName: data.legalName } : {}),
+      ...(data.addressLine1 !== undefined ? { addressLine1: data.addressLine1 } : {}),
+      ...(data.addressLine2 !== undefined ? { addressLine2: data.addressLine2 } : {}),
+      ...(data.postalCode !== undefined ? { postalCode: data.postalCode } : {}),
+      ...(data.city !== undefined ? { city: data.city } : {}),
+      ...(data.country !== undefined ? { country: data.country } : {}),
+      ...(data.phone !== undefined ? { phone: data.phone } : {}),
+      ...(data.billingEmail !== undefined ? { billingEmail: data.billingEmail } : {}),
+      ...(data.siret !== undefined ? { siret: data.siret } : {}),
+      ...(data.vatNumber !== undefined ? { vatNumber: data.vatNumber } : {}),
+      ...(data.logoUrl !== undefined ? { logoUrl: data.logoUrl } : {}),
+      ...(data.invoiceFooterLegal !== undefined ? { invoiceFooterLegal: data.invoiceFooterLegal } : {}),
+      ...(data.vatMode !== undefined ? { vatMode: data.vatMode } : {})
+    }
+  });
+  res.json(updated);
 });
 
 app.post("/tables", authRequired, staffOnly, async (req, res) => {
@@ -749,6 +796,8 @@ app.post("/public/orders", async (req, res) => {
       restaurantSlug: z.string().min(1),
       tableToken: z.string().min(1),
       notes: z.string().optional(),
+      customerName: z.string().max(120).optional(),
+      covers: z.number().int().min(1).max(99).optional(),
       items: z.array(
         z.object({
           menuItemId: z.string().min(1),
@@ -814,6 +863,8 @@ app.post("/public/orders", async (req, res) => {
       orderNumber: nextOrderNumber,
       totalCents,
       notes: body.data.notes,
+      customerName: body.data.customerName?.trim() || null,
+      covers: body.data.covers ?? null,
       items: {
         create: orderLines.map((line) => ({
           quantity: line.quantity,
@@ -925,6 +976,295 @@ app.get("/orders/history", authRequired, async (req, res) => {
   });
 
   res.json(orders);
+});
+
+/** Tables avec commandes servies non encaissées (caisse). */
+app.get("/caisse/tables-overview", authRequired, staffOnly, async (req, res) => {
+  const rid = req.user!.restaurantId;
+  const rows = await db.order.groupBy({
+    by: ["tableId"],
+    where: {
+      restaurantId: rid,
+      status: OrderStatus.SERVED,
+      billId: null
+    },
+    _sum: { totalCents: true },
+    _count: { id: true }
+  });
+  if (rows.length === 0) {
+    res.json([]);
+    return;
+  }
+  const tables = await db.table.findMany({
+    where: { restaurantId: rid, id: { in: rows.map((r) => r.tableId) } },
+    select: { id: true, name: true }
+  });
+  const byId = new Map(tables.map((t) => [t.id, t.name]));
+  res.json(
+    rows.map((r) => ({
+      tableId: r.tableId,
+      tableName: byId.get(r.tableId) ?? "Table",
+      unpaidOrderCount: r._count.id,
+      unpaidTotalCents: r._sum.totalCents ?? 0
+    }))
+  );
+});
+
+/** Détail des commandes à encaisser pour une table. */
+app.get("/caisse/tables/:tableId/unpaid", authRequired, staffOnly, async (req, res) => {
+  const tableId = Array.isArray(req.params.tableId) ? req.params.tableId[0] : req.params.tableId;
+  const rid = req.user!.restaurantId;
+  const table = await db.table.findFirst({
+    where: { id: tableId, restaurantId: rid },
+    select: { id: true, name: true }
+  });
+  if (!table) return res.status(404).json({ message: "Table introuvable." });
+
+  const orders = await db.order.findMany({
+    where: {
+      restaurantId: rid,
+      tableId,
+      status: OrderStatus.SERVED,
+      billId: null
+    },
+    include: {
+      table: true,
+      items: { include: { options: true } }
+    },
+    orderBy: { createdAt: "asc" }
+  });
+  const unpaidTotalCents = orders.reduce((s, o) => s + o.totalCents, 0);
+  res.json({ table, orders, unpaidTotalCents });
+});
+
+const billInclude = {
+  table: { select: { id: true, name: true } },
+  restaurant: {
+    select: {
+      name: true,
+      slug: true,
+      currency: true,
+      legalName: true,
+      addressLine1: true,
+      addressLine2: true,
+      postalCode: true,
+      city: true,
+      country: true,
+      phone: true,
+      billingEmail: true,
+      siret: true,
+      vatNumber: true,
+      logoUrl: true,
+      invoiceFooterLegal: true,
+      vatMode: true
+    }
+  },
+  registeredBy: { select: { email: true } },
+  orders: {
+    include: {
+      table: true,
+      items: { include: { options: true } }
+    },
+    orderBy: { createdAt: "asc" as const }
+  }
+} satisfies Prisma.BillInclude;
+
+/** Crée une facture / ticket et rattache les commandes (servies, non encaissées). */
+app.post("/caisse/bills", authRequired, staffOnly, async (req, res) => {
+  const body = z
+    .object({
+      tableId: z.string().min(1),
+      orderIds: z.array(z.string()).min(1),
+      paymentMethod: z.nativeEnum(PaymentMethod)
+    })
+    .safeParse(req.body);
+  if (!body.success) return res.status(400).json({ message: "Invalid payload" });
+
+  const { tableId, orderIds, paymentMethod } = body.data;
+  const rid = req.user!.restaurantId;
+  const userId = req.user!.userId;
+
+  const table = await db.table.findFirst({
+    where: { id: tableId, restaurantId: rid },
+    select: { id: true }
+  });
+  if (!table) return res.status(404).json({ message: "Table introuvable." });
+
+  const orders = await db.order.findMany({
+    where: {
+      id: { in: orderIds },
+      restaurantId: rid,
+      tableId,
+      status: OrderStatus.SERVED,
+      billId: null
+    },
+    select: { id: true, totalCents: true }
+  });
+
+  if (orders.length !== orderIds.length) {
+    return res.status(400).json({
+      message:
+        "Certaines commandes sont introuvables, déjà encaissées, ou ne sont pas au statut « Servi » sur cette table."
+    });
+  }
+
+  const totalCents = orders.reduce((s, o) => s + o.totalCents, 0);
+
+  try {
+    const bill = await db.$transaction(async (tx) => {
+      const maxInv = await tx.bill.aggregate({
+        where: { restaurantId: rid },
+        _max: { invoiceNumber: true }
+      });
+      const invoiceNumber = (maxInv._max.invoiceNumber ?? 0) + 1;
+
+      let paymentReference = uniquePaymentReference();
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const clash = await tx.bill.findUnique({ where: { paymentReference }, select: { id: true } });
+        if (!clash) break;
+        paymentReference = uniquePaymentReference();
+      }
+
+      const publicViewToken = randomUUID();
+      const cashier = await tx.user.findUnique({ where: { id: userId }, select: { email: true } });
+      const registeredByLabel = cashier?.email ?? null;
+
+      const created = await tx.bill.create({
+        data: {
+          restaurantId: rid,
+          tableId,
+          invoiceNumber,
+          totalCents,
+          paymentMethod,
+          registeredByUserId: userId,
+          paymentReference,
+          publicViewToken,
+          registeredByLabel
+        }
+      });
+
+      const { count } = await tx.order.updateMany({
+        where: {
+          id: { in: orderIds },
+          restaurantId: rid,
+          tableId,
+          status: OrderStatus.SERVED,
+          billId: null
+        },
+        data: { billId: created.id }
+      });
+
+      if (count !== orderIds.length) {
+        throw new Error("CONFLICT_UPDATE");
+      }
+
+      return tx.bill.findUniqueOrThrow({
+        where: { id: created.id },
+        include: billInclude
+      });
+    });
+
+    res.status(201).json(bill);
+  } catch (e) {
+    if (e instanceof Error && e.message === "CONFLICT_UPDATE") {
+      return res.status(409).json({ message: "Encaissement impossible : commandes modifiées entre-temps." });
+    }
+    console.error(e);
+    return res.status(500).json({ message: "Erreur lors de l’encaissement." });
+  }
+});
+
+/** Liste des factures sur une période (compta / export). */
+app.get("/caisse/bills", authRequired, staffOnly, async (req, res) => {
+  const fromRaw = typeof req.query.from === "string" ? req.query.from : undefined;
+  const toRaw = typeof req.query.to === "string" ? req.query.to : undefined;
+  if (!fromRaw || !toRaw) {
+    return res.status(400).json({ message: "Query params `from` and `to` (ISO 8601) are required" });
+  }
+  const from = new Date(fromRaw);
+  const to = new Date(toRaw);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) {
+    return res.status(400).json({ message: "Invalid date range" });
+  }
+
+  const rid = req.user!.restaurantId;
+  const bills = await db.bill.findMany({
+    where: {
+      restaurantId: rid,
+      createdAt: { gte: from, lte: to }
+    },
+    include: {
+      table: { select: { id: true, name: true } },
+      orders: { select: { id: true, orderNumber: true, totalCents: true } }
+    },
+    orderBy: { createdAt: "desc" },
+    take: 500
+  });
+  res.json(bills);
+});
+
+/** Détail facture (aperçu / impression). */
+app.get("/caisse/bills/:id", authRequired, staffOnly, async (req, res) => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const bill = await db.bill.findFirst({
+    where: { id, restaurantId: req.user!.restaurantId },
+    include: billInclude
+  });
+  if (!bill) return res.status(404).json({ message: "Facture introuvable." });
+  res.json(bill);
+});
+
+/** Consultation publique d’une facture (QR code, lien court). */
+app.get("/public/bills/:token", async (req, res) => {
+  const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
+  if (!token?.trim()) return res.status(400).json({ message: "Token requis." });
+  const bill = await db.bill.findFirst({
+    where: { publicViewToken: token.trim() },
+    include: billInclude
+  });
+  if (!bill) return res.status(404).json({ message: "Facture introuvable ou lien expiré." });
+  const { registeredBy: _rb, ...safe } = bill;
+  res.json({ ...safe, registeredBy: null });
+});
+
+/** Totaux encaissés par mode de paiement (compta). */
+app.get("/caisse/summary", authRequired, staffOnly, async (req, res) => {
+  const fromRaw = typeof req.query.from === "string" ? req.query.from : undefined;
+  const toRaw = typeof req.query.to === "string" ? req.query.to : undefined;
+  if (!fromRaw || !toRaw) {
+    return res.status(400).json({ message: "Query params `from` and `to` (ISO 8601) are required" });
+  }
+  const from = new Date(fromRaw);
+  const to = new Date(toRaw);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) {
+    return res.status(400).json({ message: "Invalid date range" });
+  }
+
+  const rid = req.user!.restaurantId;
+  const bills = await db.bill.findMany({
+    where: { restaurantId: rid, createdAt: { gte: from, lte: to } },
+    select: { totalCents: true, paymentMethod: true }
+  });
+
+  const byPaymentMethod: Record<PaymentMethod, number> = {
+    CASH: 0,
+    CARD: 0,
+    OTHER: 0
+  };
+  let totalCents = 0;
+  for (const b of bills) {
+    totalCents += b.totalCents;
+    byPaymentMethod[b.paymentMethod] += b.totalCents;
+  }
+
+  res.json({
+    from: from.toISOString(),
+    to: to.toISOString(),
+    computedAt: new Date().toISOString(),
+    billCount: bills.length,
+    totalCents,
+    byPaymentMethod
+  });
 });
 
 /** Agrégats pour la vue « Pilotage » (CA, volumes, répartition) — plage en ISO côté client (fuseau du navigateur). */

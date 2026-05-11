@@ -73,6 +73,8 @@ export default function PublicMenuPage({
   const [placedTotal, setPlacedTotal] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetTab, setSheetTab] = useState<"nav" | "cart">("nav");
+  const [orderCustomerName, setOrderCustomerName] = useState("");
+  const [orderCovers, setOrderCovers] = useState("");
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [optionPickerItem, setOptionPickerItem] = useState<MenuItemRow | null>(null);
   const [optionPickerSelectedIds, setOptionPickerSelectedIds] = useState<string[]>([]);
@@ -148,7 +150,7 @@ export default function PublicMenuPage({
 
   async function submitOrder() {
     if (!resolved) return;
-    const payload = {
+    const payload: Record<string, unknown> = {
       restaurantSlug: resolved.restaurantSlug,
       tableToken: resolved.tableToken,
       items: cart.map((c) => ({
@@ -157,6 +159,10 @@ export default function PublicMenuPage({
         optionIds: c.optionIds
       }))
     };
+    const name = orderCustomerName.trim();
+    if (name) payload.customerName = name;
+    const cov = parseInt(orderCovers.trim(), 10);
+    if (!Number.isNaN(cov) && cov >= 1 && cov <= 99) payload.covers = cov;
     const order = await apiFetch<{
       id: string;
       status: string;
@@ -312,7 +318,7 @@ export default function PublicMenuPage({
                       <div className="flex min-w-0 flex-1 items-start justify-between gap-4">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-3">
-                            <p className="font-display text-[18px] font-semibold tracking-tight text-foreground">
+                            <p className="min-w-0 flex-1 break-words font-display text-[18px] font-semibold tracking-tight text-foreground [overflow-wrap:anywhere]">
                               {item.name}
                             </p>
                             <p className="shrink-0 tabular-nums text-[15px] text-muted-foreground">
@@ -320,7 +326,9 @@ export default function PublicMenuPage({
                             </p>
                           </div>
                           {item.description ? (
-                            <p className="mt-1 text-[14px] text-muted-foreground">{item.description}</p>
+                            <p className="mt-1 max-w-full break-words text-[14px] text-muted-foreground [overflow-wrap:anywhere]">
+                              {item.description}
+                            </p>
                           ) : null}
                           {(item.tags?.length ?? 0) > 0 || item.options.length > 0 ? (
                             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -537,7 +545,7 @@ export default function PublicMenuPage({
                     <li key={`${line.menuItemId}-${optionSetKey(line.optionIds)}`} className="py-3 text-[14px]">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                          <p className="text-foreground">
+                          <p className="break-words text-foreground [overflow-wrap:anywhere]">
                             <span className="font-medium tabular-nums">{line.quantity}</span>
                             <span className="text-muted-foreground">× </span>
                             {line.name}
@@ -576,6 +584,30 @@ export default function PublicMenuPage({
                     </li>
                   ))}
                 </ul>
+
+                <div className="mt-4 grid gap-3 rounded-2xl border border-border bg-secondary/40 p-4">
+                  <p className="text-[12px] font-medium text-muted-foreground">Sur place (optionnel, pour la note)</p>
+                  <label className="grid gap-1">
+                    <span className="text-[12px] text-muted-foreground">Nom</span>
+                    <input
+                      value={orderCustomerName}
+                      onChange={(e) => setOrderCustomerName(e.target.value)}
+                      maxLength={120}
+                      placeholder="ex. Martin"
+                      className="rounded-xl border border-border bg-card px-3 py-2 text-[14px] text-foreground outline-none ring-primary/25 focus:ring-2"
+                    />
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-[12px] text-muted-foreground">Couverts</span>
+                    <input
+                      value={orderCovers}
+                      onChange={(e) => setOrderCovers(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                      inputMode="numeric"
+                      placeholder="ex. 2"
+                      className="rounded-xl border border-border bg-card px-3 py-2 text-[14px] text-foreground outline-none ring-primary/25 focus:ring-2"
+                    />
+                  </label>
+                </div>
 
                 <div className="mt-4 border-t border-border pt-4">
                   <div className="flex items-baseline justify-between gap-4">
@@ -634,7 +666,7 @@ export default function PublicMenuPage({
             {placedItems.map((line) => (
               <li key={line.id} className="py-3 text-[14px]">
                 <div className="flex justify-between gap-3">
-                  <span className="text-foreground">
+                  <span className="min-w-0 flex-1 break-words text-foreground [overflow-wrap:anywhere]">
                     <span className="tabular-nums font-medium">{line.quantity}</span>× {line.nameSnapshot}
                   </span>
                   <span className="shrink-0 tabular-nums text-muted-foreground">

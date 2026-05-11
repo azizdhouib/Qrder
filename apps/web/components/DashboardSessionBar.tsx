@@ -18,6 +18,9 @@ export function DashboardSessionBar({
             <Link href="/dashboard/comptes" className="dashboard-settings-item" role="menuitem">
               Comptes
             </Link>
+            <Link href="/dashboard/facturation" className="dashboard-settings-item" role="menuitem">
+              Facturation &amp; factures
+            </Link>
           </div>
         </details>
       )}

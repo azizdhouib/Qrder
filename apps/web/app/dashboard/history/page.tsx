@@ -1,6 +1,7 @@
 "use client";
 
 import type { MouseEvent } from "react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { TokenGate } from "@/components/TokenGate";
@@ -11,6 +12,7 @@ type HistoryOrder = {
   status: "PLACED" | "PREPARING" | "READY" | "SERVED" | "CANCELLED";
   totalCents: number;
   createdAt: string;
+  billId?: string | null;
   table: { name: string };
   items: { id: string; nameSnapshot: string; quantity: number; lineTotalCents: number }[];
 };
@@ -55,6 +57,13 @@ function HistoryBilling({ token }: { token: string }) {
   const [orders, setOrders] = useState<HistoryOrder[]>([]);
   const [status, setStatus] = useState<"" | HistoryOrder["status"]>("");
   const [query, setQuery] = useState("");
+  const [staff, setStaff] = useState(false);
+
+  useEffect(() => {
+    apiFetch<{ role: string }>("/me", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => setStaff(r.role === "OWNER" || r.role === "MANAGER"))
+      .catch(() => setStaff(false));
+  }, [token]);
 
   async function load() {
     const qs = status ? `?status=${status}` : "";
@@ -97,7 +106,11 @@ function HistoryBilling({ token }: { token: string }) {
         <p className="history-billing-kicker">Historique</p>
         <h1 className="history-billing-title">Notes &amp; encaissements</h1>
         <p className="history-billing-lead muted">
-          Téléchargez la note PDF ou envoyez-la par e-mail au client. CA affiché :{" "}
+          Encaissement et factures :{" "}
+          <Link href="/dashboard/caisse" className="link-inline">
+            Caisse
+          </Link>
+          . CA commandes (hors annulées) sur l&apos;historique chargé :{" "}
           <strong className="history-billing-ca">{formatEurCompact(totalRevenue)}</strong>
         </p>
       </header>
@@ -156,8 +169,22 @@ function HistoryBilling({ token }: { token: string }) {
                 <div className="history-bill-total">{formatEurCompact(order.totalCents)}</div>
               </div>
               <p className="history-bill-meta muted">
-                {formatRelativeHistory(order.createdAt)} - {order.items.length} article
-                {order.items.length !== 1 ? "s" : ""} - {STATUS_FR[order.status].toLowerCase()} - non encaissée
+                {formatRelativeHistory(order.createdAt)} — {order.items.length} article
+                {order.items.length !== 1 ? "s" : ""} — {STATUS_FR[order.status].toLowerCase()}
+                {order.status === "SERVED" && order.billId
+                  ? " — encaissée"
+                  : order.status === "SERVED"
+                    ? " — à encaisser (caisse)"
+                    : ""}
+                {staff && order.billId ? (
+                  <>
+                    {" "}
+                    ·{" "}
+                    <Link href={`/dashboard/caisse/facture/${order.billId}`} className="link-inline">
+                      Voir la facture
+                    </Link>
+                  </>
+                ) : null}
               </p>
               {order.items.length > 0 ? (
                 <ul className="history-bill-lines">

@@ -26,6 +26,23 @@ enum OrderStatus {
   @@map("qr_order_status")
 }
 
+enum PaymentMethod {
+  CASH
+  CARD
+  OTHER
+
+  @@map("qr_payment_method")
+}
+
+/// Affichage TVA sur factures / tickets (prix catalogue en TTC).
+enum RestaurantVatMode {
+  TTC_FR_10
+  TTC_FR_20
+  VAT_EXEMPT_ART293B
+
+  @@map("qr_restaurant_vat_mode")
+}
+
 model Restaurant {
   id         String         @id @default(cuid())
   name       String
@@ -33,12 +50,29 @@ model Restaurant {
   currency   String         @default("EUR")
   suspended  Boolean        @default(false)
   createdAt  DateTime       @default(now())
+  /// Raison sociale si différente du nom commercial (factures).
+  legalName  String?
+  addressLine1 String?
+  addressLine2 String?
+  postalCode String?
+  city       String?
+  country    String?        @default("FR")
+  phone      String?
+  /// Email affiché sur factures (contact / facturation).
+  billingEmail String?
+  siret      String?
+  vatNumber  String?
+  logoUrl    String?
+  /// Texte libre bas de facture (mentions légales personnalisées).
+  invoiceFooterLegal String?
+  vatMode    RestaurantVatMode @default(TTC_FR_10)
   users      User[]
   tables     Table[]
   floorRooms FloorRoom[]
   categories MenuCategory[]
   items      MenuItem[]
   orders     Order[]
+  bills      Bill[]
 
   @@map("qr_restaurants")
 }
@@ -51,6 +85,7 @@ model User {
   createdAt    DateTime   @default(now())
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  billsRegistered Bill[] @relation("BillRegisteredBy")
 
   @@map("qr_users")
 }
@@ -94,6 +129,7 @@ model Table {
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   orders       Order[]
+  bills        Bill[]
 
   @@unique([restaurantId, qrToken])
   @@map("qr_tables")
@@ -146,10 +182,17 @@ model Order {
   status       OrderStatus @default(PLACED)
   totalCents   Int
   notes        String?
+  /// Nom affiché sur la note / facture (optionnel).
+  customerName String?
+  /// Nombre de couverts (optionnel).
+  covers       Int?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @default(now()) @updatedAt
   /// Début du suivi « en cuisine » (fixé à la première entrée en PREPARING, effacé si retour en PLACED).
   preparingStartedAt DateTime?
+  /// Renseigné lors de l’encaissement (facture / note de caisse).
+  billId       String?
+  bill         Bill?       @relation(fields: [billId], references: [id], onDelete: SetNull)
   restaurantId String
   restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   tableId      String
@@ -158,6 +201,34 @@ model Order {
 
   @@unique([restaurantId, orderNumber])
   @@map("qr_orders")
+}
+
+/// Encaissement table (une ou plusieurs commandes servies regroupées).
+model Bill {
+  id                 String        @id @default(cuid())
+  restaurantId       String
+  restaurant         Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tableId            String
+  table              Table         @relation(fields: [tableId], references: [id], onDelete: Restrict)
+  /// Numéro de facture / ticket de caisse, séquentiel par établissement.
+  invoiceNumber      Int
+  totalCents         Int
+  paymentMethod      PaymentMethod
+  createdAt          DateTime      @default(now())
+  /// Référence transaction / trace caisse (unique).
+  paymentReference   String        @unique
+  /// Jeton public pour consulter la facture sans compte (QR).
+  publicViewToken    String        @unique
+  /// Libellé caissier au moment de l’encaissement (ex. email).
+  registeredByLabel  String?
+  discountCents      Int           @default(0)
+  serviceFeeCents    Int           @default(0)
+  registeredByUserId String?
+  registeredBy       User?         @relation("BillRegisteredBy", fields: [registeredByUserId], references: [id], onDelete: SetNull)
+  orders             Order[]
+
+  @@unique([restaurantId, invoiceNumber])
+  @@map("qr_bills")
 }
 
 model OrderItem {

@@ -419,8 +419,8 @@ a {
 
 /* Boutons dashboard / pages avec <main> classique uniquement — exclut menu client (main.client-public-menu) */
 /* Exclut aussi les contrôles « Ma carte » (.menu-config-*) pour ne pas écraser onglets / icônes */
-main:not(.client-public-menu) button:not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab),
-.dashboard-app-shell button:not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab) {
+main:not(.client-public-menu) button:not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab):not(.invoice-toolbar-seg-btn):not(.caisse-checkout-btn),
+.dashboard-app-shell button:not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab):not(.invoice-toolbar-seg-btn):not(.caisse-checkout-btn) {
   border: none;
   border-radius: 999px;
   padding: 0.62rem 1.35rem;
@@ -436,13 +436,13 @@ main:not(.client-public-menu) button:not(.menu-config-tab):not(.menu-config-icon
   box-shadow: var(--shadow-a);
 }
 
-main:not(.client-public-menu) button:hover:not(.btn-secondary):not(.btn-danger):not(.menu-tab):not(.btn-primary-ios):not(.btn-outline-primary):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab):not(:disabled),
-.dashboard-app-shell button:hover:not(.btn-secondary):not(.btn-danger):not(.menu-tab):not(.btn-primary-ios):not(.btn-outline-primary):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab):not(:disabled) {
+main:not(.client-public-menu) button:hover:not(.btn-secondary):not(.btn-danger):not(.menu-tab):not(.btn-primary-ios):not(.btn-outline-primary):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab):not(.invoice-toolbar-seg-btn):not(.caisse-checkout-btn):not(:disabled),
+.dashboard-app-shell button:hover:not(.btn-secondary):not(.btn-danger):not(.menu-tab):not(.btn-primary-ios):not(.btn-outline-primary):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab):not(.invoice-toolbar-seg-btn):not(.caisse-checkout-btn):not(:disabled) {
   box-shadow: var(--shadow-a), 0 6px 18px oklch(0.2 0.02 270 / 0.12);
 }
 
-main:not(.client-public-menu) button:hover:not(:disabled):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab),
-.dashboard-app-shell button:hover:not(:disabled):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab) {
+main:not(.client-public-menu) button:hover:not(:disabled):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab):not(.invoice-toolbar-seg-btn):not(.caisse-checkout-btn),
+.dashboard-app-shell button:hover:not(:disabled):not(.menu-config-tab):not(.menu-config-icon-btn):not(.menu-config-preview-btn):not(.menu-config-btn-primary):not(.kds-line):not(.kds-toast-close):not(.tables-modal-backdrop):not(.tables-modal-close):not(.tables-pilot-banner-link):not(.tables-manage-btn-cancel):not(.tables-manage-btn-save):not(.tables-manage-btn-delete):not(.tables-qr-sheet-btn-cancel):not(.tables-qr-sheet-btn-download):not(.tables-pilot-qr-regen-btn):not(.tables-regen-qr-btn-cancel):not(.tables-regen-qr-btn-confirm):not(.tables-pilot-room-chip):not(.tables-add-room-btn-cancel):not(.tables-add-room-btn-save):not(.tables-rooms-manage-btn-save):not(.tables-rooms-manage-btn-delete):not(.tables-floor-room-tab):not(.invoice-toolbar-seg-btn):not(.caisse-checkout-btn) {
   transform: translateY(-1px);
 }
 
@@ -2760,6 +2760,956 @@ textarea:focus {
   padding: 1.5rem 1.25rem;
   text-align: center;
   font-size: 0.9375rem;
+}
+
+/* ——— Caisse & compta ——— */
+.dashboard-main-content .caisse-page,
+.dashboard-main-content .compta-page,
+.dashboard-main-content .invoice-page {
+  max-width: min(1100px, 100%);
+  width: 100%;
+  margin: 0 auto;
+  padding: 0.85rem max(0.75rem, env(safe-area-inset-left, 0px)) 2.5rem
+    max(0.75rem, env(safe-area-inset-right, 0px));
+}
+
+.dashboard-main-content .caisse-page:has(.caisse-stack--focused) {
+  max-width: min(68rem, 100%);
+  width: 100%;
+  padding: 1.1rem max(1.15rem, env(safe-area-inset-left, 0px)) 2.75rem
+    max(1.15rem, env(safe-area-inset-right, 0px));
+  /* Pas de fond propre : même rendu que le reste du dashboard (héritage depuis .dashboard-main-content / body). */
+  background: transparent;
+}
+
+.caisse-stack,
+.compta-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.caisse-stack--focused {
+  gap: 1rem;
+  width: 100%;
+  max-width: min(56rem, 100%);
+  margin: 0 auto;
+}
+
+.caisse-header,
+.compta-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.caisse-header--focused {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+@media (min-width: 700px) {
+  .caisse-header--focused {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.25rem;
+  }
+
+  .caisse-header--focused .caisse-refresh--ghost {
+    align-self: center;
+  }
+}
+
+.caisse-header-text {
+  min-width: 0;
+}
+
+.caisse-back-plan {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  color: color-mix(in oklch, var(--muted-foreground), var(--foreground) 22%);
+  transition: color 0.15s ease;
+}
+
+.caisse-back-plan:hover {
+  color: var(--foreground);
+}
+
+.caisse-kicker {
+  margin: 0 0 0.4rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--primary), var(--muted-foreground) 35%);
+}
+
+.compta-kicker {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.caisse-title {
+  margin: 0 0 0.45rem;
+  font-size: clamp(1.5rem, 3.8vw, 2rem);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
+  color: var(--foreground);
+}
+
+.compta-title {
+  margin: 0 0 0.45rem;
+  font-size: clamp(1.5rem, 3.8vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.12;
+  color: var(--foreground);
+}
+
+.caisse-stack--focused .caisse-title {
+  font-size: clamp(1.65rem, 4.5vw, 2.05rem);
+  font-weight: 600;
+  letter-spacing: -0.05em;
+}
+
+.caisse-lead {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  max-width: 42rem;
+  font-weight: 400;
+}
+
+.compta-lead {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  max-width: 42rem;
+}
+
+.caisse-stack--focused .caisse-lead {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  max-width: none;
+}
+
+.caisse-refresh {
+  flex-shrink: 0;
+}
+
+.caisse-refresh--ghost {
+  align-self: flex-start;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 25%);
+  background: color-mix(in oklch, var(--secondary), transparent 40%);
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.caisse-refresh--ghost:hover {
+  background: color-mix(in oklch, var(--secondary), transparent 15%);
+  border-color: color-mix(in oklch, var(--border), transparent 10%);
+}
+
+.caisse-flash {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in oklch, var(--destructive), transparent 55%);
+  background: color-mix(in oklch, var(--destructive), transparent 90%);
+  color: var(--foreground);
+}
+
+.caisse-flash--soft {
+  border-radius: 0.85rem;
+  border-color: color-mix(in oklch, var(--destructive), transparent 40%);
+  background: color-mix(in oklch, var(--destructive), transparent 93%);
+}
+
+.caisse-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.caisse-layout--single {
+  grid-template-columns: 1fr;
+  max-width: min(56rem, 100%);
+  margin: 0 auto;
+  width: 100%;
+}
+
+@media (max-width: 800px) {
+  .caisse-layout:not(.caisse-layout--single) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.caisse-col-title {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.caisse-col--list .caisse-hint {
+  margin-top: 1rem;
+  margin-bottom: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.caisse-empty-inline {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.caisse-placeholder {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.caisse-sheet {
+  border-radius: 1.25rem;
+  padding: 1.35rem 1.35rem 1.4rem;
+  background: color-mix(in oklch, var(--card), transparent 6%);
+  border: 1px solid color-mix(in oklch, var(--border), transparent 30%);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--foreground), transparent 94%),
+    0 1.25rem 3rem color-mix(in oklch, var(--foreground), transparent 91%);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+
+.caisse-sheet--focused {
+  padding: clamp(1.35rem, 2.2vw, 1.75rem) clamp(1.25rem, 3vw, 2.1rem) clamp(1.4rem, 2.2vw, 1.85rem);
+  /* Même plan que la page : pas de seconde « carte » flottante en dark. */
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.caisse-sheet-body--focused {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  margin-top: 0.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid color-mix(in oklch, var(--border), transparent 55%);
+}
+
+.caisse-sheet-total-slot {
+  padding: 1rem 1.15rem;
+  border-radius: 0.75rem;
+  background: color-mix(in oklch, var(--secondary), var(--background) 25%);
+  border: 1px solid color-mix(in oklch, var(--border), transparent 45%);
+}
+
+.caisse-sheet-total-slot .caisse-sheet-total {
+  font-size: clamp(1.65rem, 3.5vw, 2.1rem);
+}
+
+.caisse-order-pick--focused {
+  margin: 0;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+.caisse-sheet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.caisse-sheet-actions .caisse-pay-label {
+  margin: 0;
+}
+
+.caisse-sheet-actions .caisse-checkout-btn {
+  width: 100%;
+  flex: none;
+}
+
+@media (min-width: 700px) {
+  .caisse-sheet-body--focused {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) min(17.75rem, 34%);
+    grid-template-rows: auto 1fr;
+    gap: 1.15rem 1.5rem;
+    align-items: stretch;
+  }
+
+  .caisse-sheet-total-slot {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .caisse-order-pick--focused {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    max-height: min(52vh, 28rem);
+    overflow-y: auto;
+    padding-right: 0.2rem;
+    margin: 0;
+  }
+
+  .caisse-sheet-actions {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: end;
+    padding-top: 0.25rem;
+  }
+
+  .caisse-order-pick--focused.caisse-order-pick {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+}
+
+@media (min-width: 900px) {
+  .caisse-sheet-body--focused {
+    grid-template-columns: minmax(0, 1fr) min(19rem, 32%);
+    gap: 1.25rem 1.75rem;
+  }
+}
+
+.caisse-col {
+  min-width: 0;
+}
+
+.caisse-sheet-head {
+  margin-bottom: 1.05rem;
+}
+
+.caisse-sheet-eyebrow {
+  margin: 0 0 0.15rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.caisse-sheet-total {
+  margin: 0;
+  font-size: 1.85rem;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  color: var(--foreground);
+}
+
+.caisse-empty-sheet {
+  text-align: center;
+  padding: 0.5rem 0.25rem 0.35rem;
+}
+
+.caisse-empty-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.caisse-empty-copy {
+  margin: 0 0 1.1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.caisse-empty-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--primary-foreground);
+  background: color-mix(in oklch, var(--primary), oklch(0.35 0.08 255) 12%);
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 45%);
+  transition: filter 0.15s ease;
+}
+
+.caisse-empty-cta:hover {
+  filter: brightness(1.06);
+}
+
+.caisse-sheet-foot {
+  margin: 1.35rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid color-mix(in oklch, var(--border), transparent 55%);
+  font-size: 0.8125rem;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.caisse-sheet-foot a {
+  font-weight: 500;
+  text-decoration: none;
+  color: color-mix(in oklch, var(--muted-foreground), var(--foreground) 25%);
+}
+
+.caisse-sheet-foot a:hover {
+  color: var(--foreground);
+}
+
+.caisse-sheet-foot-sep {
+  opacity: 0.55;
+}
+
+.caisse-col-sub {
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.caisse-table-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.caisse-table-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.65rem;
+  border: 1px solid var(--border);
+  background: var(--secondary);
+  color: var(--foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.caisse-table-row:hover {
+  border-color: color-mix(in oklch, var(--primary), transparent 45%);
+}
+
+.caisse-table-row--active {
+  border-color: color-mix(in oklch, var(--primary), transparent 25%);
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+}
+
+.caisse-table-name {
+  font-weight: 700;
+}
+
+.caisse-table-meta {
+  font-size: 0.8125rem;
+}
+
+.caisse-table-total {
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.caisse-order-pick {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.caisse-order-pick.caisse-order-pick--focused {
+  margin-bottom: 0;
+}
+
+.caisse-order-label {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  padding: 0.95rem 1rem 0.95rem calc(1rem + 1.375rem + 0.75rem);
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 40%);
+  background: color-mix(in oklch, var(--secondary), var(--background) 20%);
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.caisse-order-label--on {
+  border-color: color-mix(in oklch, var(--primary), transparent 40%);
+  background: color-mix(in oklch, var(--secondary), var(--background) 12%);
+  box-shadow: none;
+}
+
+/* Cercle type iOS (remplace la case native carrée + accent-color). */
+.caisse-order-label::before {
+  content: "";
+  position: absolute;
+  left: 1rem;
+  top: 0.95rem;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 1.75px solid color-mix(in oklch, var(--muted-foreground), var(--border) 35%);
+  background: color-mix(in oklch, var(--background), transparent 15%);
+  pointer-events: none;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.caisse-order-label:has(.caisse-order-cb:checked)::before {
+  background: var(--primary);
+  border-color: var(--primary);
+  box-shadow: inset 0 1px 0 color-mix(in oklch, oklch(1 0 0), transparent 78%);
+}
+
+.caisse-order-label:has(.caisse-order-cb:focus-visible)::before {
+  outline: 2px solid color-mix(in oklch, var(--primary), transparent 25%);
+  outline-offset: 3px;
+}
+
+.caisse-order-cb {
+  position: absolute;
+  left: 1rem;
+  top: 0.95rem;
+  width: 1.375rem;
+  height: 1.375rem;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+  flex-shrink: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.caisse-order-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.caisse-order-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-size: 0.9375rem;
+}
+
+.caisse-order-num {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.caisse-order-price {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: color-mix(in oklch, var(--foreground), var(--muted-foreground) 18%);
+}
+
+.caisse-order-lines {
+  list-style: none;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: color-mix(in oklch, var(--muted-foreground), var(--foreground) 12%);
+}
+
+.caisse-pay-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+}
+
+.caisse-pay-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.caisse-pay-field-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--muted-foreground), var(--foreground) 15%);
+}
+
+.caisse-pay-select {
+  min-height: 2.75rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 15%);
+  background: color-mix(in oklch, var(--secondary), transparent 35%);
+  color: var(--foreground);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  box-shadow: inset 0 1px 2px color-mix(in oklch, var(--foreground), transparent 94%);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.caisse-pay-select:focus {
+  outline: none;
+  border-color: color-mix(in oklch, var(--primary), transparent 35%);
+  background: color-mix(in oklch, var(--secondary), transparent 20%);
+}
+
+.caisse-checkout-btn {
+  flex: 1 1 12rem;
+  min-height: 3rem;
+  padding: 0 1.25rem;
+  border: none;
+  /* Style proche des boutons remplis iOS / macOS : pas de halo bleu, pas de dégradé « gamer ». */
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  color: var(--primary-foreground);
+  background: var(--primary);
+  box-shadow: 0 1px 2px color-mix(in oklch, var(--foreground), transparent 88%);
+  transition: background 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+}
+
+.caisse-checkout-btn:hover:not(:disabled) {
+  filter: brightness(1.05);
+  box-shadow: 0 2px 6px color-mix(in oklch, var(--foreground), transparent 86%);
+}
+
+.caisse-checkout-btn:active:not(:disabled) {
+  transform: scale(0.985);
+  filter: brightness(0.97);
+}
+
+.caisse-checkout-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.compta-periods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.compta-period {
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--secondary);
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.compta-period--active {
+  border-color: color-mix(in oklch, var(--primary), transparent 35%);
+  background: color-mix(in oklch, var(--primary), transparent 88%);
+}
+
+.compta-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+}
+
+.compta-kpi {
+  padding: 1rem 1.1rem;
+}
+
+.compta-kpi-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.compta-kpi-value {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.compta-kpi-foot {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+}
+
+.compta-bills {
+  padding: 1.1rem 1.2rem;
+}
+
+.compta-bills-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.compta-bills-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.compta-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.compta-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.compta-table th,
+.compta-table td {
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.compta-table th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+}
+
+.invoice-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.invoice-toolbar-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.85rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.invoice-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.invoice-toolbar-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.invoice-toolbar-seg {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  background: var(--secondary);
+}
+
+.invoice-toolbar-seg-btn {
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.38rem 0.75rem;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.invoice-toolbar-seg-btn--on {
+  background: var(--foreground);
+  color: var(--background);
+  opacity: 1;
+}
+
+.invoice-toolbar-spacer {
+  flex: 1;
+  min-width: 0.5rem;
+}
+
+.invoice-preview-wrap {
+  max-width: min(900px, 100%);
+  margin: 0 auto;
+  padding: 0.5rem 0 2rem;
+}
+
+.dashboard-main-content .invoice-page--dashboard {
+  max-width: min(960px, 100%);
+  margin: 0 auto;
+  padding: 0.85rem max(0.75rem, env(safe-area-inset-left, 0px)) 2.5rem
+    max(0.75rem, env(safe-area-inset-right, 0px));
+}
+
+.public-bill-page {
+  min-height: 100vh;
+  padding: 1rem max(0.75rem, env(safe-area-inset-left, 0px)) 2.5rem max(0.75rem, env(safe-area-inset-right, 0px));
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.public-bill-toolbar {
+  max-width: min(960px, 100%);
+  margin: 0 auto 1rem;
+}
+
+.dashboard-main-content .facturation-page {
+  max-width: min(720px, 100%);
+  margin: 0 auto;
+  padding: 0.85rem max(0.75rem, env(safe-area-inset-left, 0px)) 2.5rem max(0.75rem, env(safe-area-inset-right, 0px));
+}
+
+.facturation-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.facturation-kicker {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.facturation-title {
+  margin: 0 0 0.45rem;
+  font-size: clamp(1.45rem, 3.5vw, 1.85rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.facturation-lead {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.facturation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem 1.35rem 1.5rem;
+}
+
+.facturation-section-title {
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.facturation-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.facturation-input,
+.facturation-textarea {
+  width: 100%;
+  border-radius: 0.55rem;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.9375rem;
+  padding: 0.55rem 0.65rem;
+  font-weight: 500;
+}
+
+.facturation-textarea {
+  resize: vertical;
+  min-height: 6rem;
+}
+
+.facturation-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 520px) {
+  .facturation-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.facturation-actions {
+  margin-top: 0.5rem;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .dashboard-app-shell .dashboard-top-bar,
+  .dashboard-app-shell .dashboard-main-content > *:not(.invoice-page) {
+    display: none !important;
+  }
+
+  .dashboard-main-content .invoice-page,
+  .dashboard-main-content .invoice-page--dashboard {
+    max-width: none;
+    padding: 0;
+  }
+
+  .invoice-preview-wrap {
+    max-width: none;
+    padding: 0;
+  }
 }
 
 .history-order-card {
@@ -5148,13 +6098,41 @@ select.tables-manage-select {
   margin-top: 0.7rem;
 }
 
-.dashboard-app-shell .tables-modal-tool-btn {
+.dashboard-app-shell .tables-modal-tool-btn,
+.dashboard-app-shell a.tables-modal-tool-btn {
   min-height: 2.35rem !important;
   padding: 0 1rem !important;
   border-radius: 0.65rem !important;
   font-size: 0.8125rem !important;
   font-weight: 600 !important;
   box-shadow: none !important;
+}
+
+.dashboard-app-shell a.tables-modal-tool-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none !important;
+  font: inherit !important;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.dashboard-app-shell a.btn-secondary.tables-modal-tool-btn {
+  background: transparent !important;
+  color: var(--primary) !important;
+  border: none !important;
+}
+
+.dashboard-app-shell a.btn-secondary.tables-modal-tool-btn:hover {
+  background: var(--secondary) !important;
+  color: var(--primary) !important;
+  transform: none !important;
+}
+
+.dashboard-app-shell a.btn-secondary.tables-modal-tool-btn:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--primary), transparent 35%);
+  outline-offset: 2px;
 }
 
 .dashboard-app-shell .tables-modal-tool-btn:hover:not(:disabled) {

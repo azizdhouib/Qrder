@@ -1,10 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { jsPDF } from "jspdf";
 import { API_URL, apiFetch } from "@/lib/api";
 import { TokenGate } from "@/components/TokenGate";
-import { AlertTriangle, Building2, Download, Pencil, QrCode, RefreshCw, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Building2,
+  Download,
+  Pencil,
+  QrCode,
+  RefreshCw,
+  X
+} from "lucide-react";
 
 /** Zoom zone du plan : min = ancien 140 % (taille de salle « compacte »), au‑dessus = plus d’espace vertical. */
 const LS_TABLES_PLAN_ZOOM = "tablesPilotPlanZoomPct_v2";
@@ -71,6 +80,13 @@ type AnalyticsResponse = {
   topItems: { name: string; quantitySold: number; revenueCents: number }[];
 };
 
+type CaisseTableOverviewRow = {
+  tableId: string;
+  tableName: string;
+  unpaidOrderCount: number;
+  unpaidTotalCents: number;
+};
+
 type FloorKey = "libre" | "salle" | "cuisine" | "servir";
 
 const FLOOR_LABEL: Record<FloorKey, string> = {
@@ -96,15 +112,17 @@ function greetingWord(): string {
   return "Bonsoir";
 }
 
-function floorKeyForTable(tableId: string, orders: KitchenOrder[]): FloorKey {
+function floorKeyForTable(
+  tableId: string,
+  orders: KitchenOrder[],
+  tablesWithUnpaidServed: ReadonlySet<string>
+): FloorKey {
+  if (tablesWithUnpaidServed.has(tableId)) return "salle";
   const active = orders.filter(
     (o) => o.table.id === tableId && (o.status === "PLACED" || o.status === "PREPARING" || o.status === "READY")
   );
   if (active.length === 0) return "libre";
-  const rank = (s: string) => (s === "READY" ? 3 : s === "PREPARING" ? 2 : 1);
-  const best = active.slice().sort((a, b) => rank(b.status) - rank(a.status))[0];
-  if (best.status === "READY") return "servir";
-  if (best.status === "PREPARING") return "cuisine";
+  /* Tant que la table n’est pas libérée par l’encaissement : tout le service reste « en salle » (bleu), pas cuisine / à servir. */
   return "salle";
 }
 
@@ -313,6 +331,7 @@ function TablesPilot({ token }: { token: string }) {
   const [tables, setTables] = useState<Table[]>([]);
   const [me, setMe] = useState<MeResponse | null>(null);
   const [kitchenOrders, setKitchenOrders] = useState<KitchenOrder[]>([]);
+  const [unpaidServedTableIds, setUnpaidServedTableIds] = useState<ReadonlySet<string>>(() => new Set());
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [origin, setOrigin] = useState("");
   const [loading, setLoading] = useState(true);
@@ -326,6 +345,8 @@ function TablesPilot({ token }: { token: string }) {
   const [regenerateQrBusy, setRegenerateQrBusy] = useState(false);
   const [regenerateQrError, setRegenerateQrError] = useState<string | null>(null);
   const [modalTable, setModalTable] = useState<Table | null>(null);
+  const [modalHistoryOrders, setModalHistoryOrders] = useState<KitchenOrder[]>([]);
+  const [modalHistoryLoading, setModalHistoryLoading] = useState(false);
   const [tablesEditMode, setTablesEditMode] = useState(false);
   const [manageTable, setManageTable] = useState<Table | null>(null);
   const [manageName, setManageName] = useState("");
@@ -407,10 +428,10 @@ function TablesPilot({ token }: { token: string }) {
   const floorByTableId = useMemo(() => {
     const m = new Map<string, FloorKey>();
     for (const t of tables) {
-      m.set(t.id, floorKeyForTable(t.id, kitchenOrders));
+      m.set(t.id, floorKeyForTable(t.id, kitchenOrders, unpaidServedTableIds));
     }
     return m;
-  }, [tables, kitchenOrders]);
+  }, [tables, kitchenOrders, unpaidServedTableIds]);
 
   const activeTablesCount = useMemo(() => {
     let n = 0;
@@ -535,17 +556,79 @@ function TablesPilot({ token }: { token: string }) {
     }
   }, [qrSheetItems, me]);
 
+  const kitchenOrdersModalDigest = useMemo(() => {
+    if (!modalTable) return "";
+    return kitchenOrders
+      .filter((o) => o.table.id === modalTable.id)
+      .map((o) => `${o.id}:${o.status}`)
+      .sort()
+      .join("|");
+  }, [kitchenOrders, modalTable]);
+
+  useEffect(() => {
+    if (!modalTable) {
+      setModalHistoryOrders([]);
+      setModalHistoryLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setModalHistoryLoading(true);
+    const now = new Date();
+    const from = startOfLocalDay(now).toISOString();
+    const to = now.toISOString();
+    apiFetch<KitchenOrder[]>(
+      `/orders/history?tableId=${encodeURIComponent(modalTable.id)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+      .then((rows) => {
+        if (cancelled) return;
+        const list = Array.isArray(rows) ? rows : [];
+        setModalHistoryOrders(
+          list.map((o) => ({
+            ...o,
+            notes: o.notes ?? null,
+            items: (o.items ?? []).map((it) => ({
+              ...it,
+              options: Array.isArray(it.options) ? it.options : []
+            }))
+          }))
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setModalHistoryOrders([]);
+      })
+      .finally(() => {
+        if (!cancelled) setModalHistoryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [modalTable, token, kitchenOrdersModalDigest]);
+
   const modalOrders = useMemo(() => {
     if (!modalTable) return [];
-    return kitchenOrders
-      .filter(
-        (o) =>
-          o.table.id === modalTable.id &&
-          (o.status === "PLACED" || o.status === "PREPARING" || o.status === "READY")
-      )
-      .slice()
+    const byId = new Map<string, KitchenOrder>();
+    for (const o of modalHistoryOrders) {
+      if (o.table.id !== modalTable.id) continue;
+      byId.set(o.id, o);
+    }
+    for (const o of kitchenOrders) {
+      if (o.table.id !== modalTable.id) continue;
+      byId.set(o.id, {
+        ...o,
+        notes: o.notes ?? null,
+        items: (o.items ?? []).map((it) => ({
+          ...it,
+          options: Array.isArray(it.options) ? it.options : []
+        }))
+      });
+    }
+    return [...byId.values()]
+      .filter((o) => o.status !== "CANCELLED")
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }, [modalTable, kitchenOrders]);
+  }, [modalTable, kitchenOrders, modalHistoryOrders]);
+
+  const modalCanEncaisser = Boolean(modalTable && unpaidServedTableIds.has(modalTable.id));
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -553,7 +636,7 @@ function TablesPilot({ token }: { token: string }) {
     const from = startOfLocalDay(now);
     const qs = `?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(now.toISOString())}`;
     try {
-      const [tableList, roomList, meRes, ko, a] = await Promise.all([
+      const [tableList, roomList, meRes, ko, a, overview] = await Promise.all([
         apiFetch<Table[]>("/tables", { headers: { Authorization: `Bearer ${token}` } }),
         apiFetch<FloorRoom[]>("/floor-rooms", { headers: { Authorization: `Bearer ${token}` } }).catch(
           () => [] as FloorRoom[]
@@ -564,7 +647,10 @@ function TablesPilot({ token }: { token: string }) {
         }).catch(() => [] as KitchenOrder[]),
         apiFetch<AnalyticsResponse>(`/dashboard/analytics${qs}`, {
           headers: { Authorization: `Bearer ${token}` }
-        }).catch(() => null)
+        }).catch(() => null),
+        apiFetch<CaisseTableOverviewRow[]>("/caisse/tables-overview", {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => [] as CaisseTableOverviewRow[])
       ]);
       setTables(tableList);
       setRooms(
@@ -581,6 +667,7 @@ function TablesPilot({ token }: { token: string }) {
           }))
         }))
       );
+      setUnpaidServedTableIds(new Set((Array.isArray(overview) ? overview : []).map((r) => r.tableId)));
       setAnalytics(a);
     } catch (e) {
       console.error(e);
@@ -1148,15 +1235,7 @@ function TablesPilot({ token }: { token: string }) {
                 </span>
                 <span className="tables-pilot-legend-item">
                   <span className="tables-pilot-dot tables-pilot-dot--salle" aria-hidden />
-                  En salle
-                </span>
-                <span className="tables-pilot-legend-item">
-                  <span className="tables-pilot-dot tables-pilot-dot--cuisine" aria-hidden />
-                  Cuisine
-                </span>
-                <span className="tables-pilot-legend-item">
-                  <span className="tables-pilot-dot tables-pilot-dot--servir" aria-hidden />
-                  À servir
+                  En salle (commandes en cours ou à encaisser)
                 </span>
               </div>
               <button
@@ -1346,9 +1425,11 @@ function TablesPilot({ token }: { token: string }) {
                   Table {modalTable.name}
                 </h2>
                 <p className="tables-modal-sub muted">
-                  {modalOrders.length === 0
-                    ? "Aucune commande en cours sur cette table."
-                    : `${modalOrders.length} commande${modalOrders.length > 1 ? "s" : ""} en cours`}
+                  {modalHistoryLoading && modalOrders.length === 0
+                    ? "Chargement des commandes…"
+                    : modalOrders.length === 0
+                      ? "Aucune commande sur cette table aujourd’hui."
+                      : `${modalOrders.length} commande${modalOrders.length > 1 ? "s" : ""} sur cette table`}
                 </p>
                 <div className="tables-modal-table-tools">
                   {modalClientUrl ? (
@@ -1367,6 +1448,14 @@ function TablesPilot({ token }: { token: string }) {
                   >
                     Télécharger le QR
                   </button>
+                  {modalCanEncaisser ? (
+                    <Link
+                      href={`/dashboard/caisse?table=${encodeURIComponent(modalTable.id)}`}
+                      className="btn-secondary tables-modal-tool-btn"
+                    >
+                      Encaisser
+                    </Link>
+                  ) : null}
                 </div>
               </div>
               <button
@@ -1380,9 +1469,11 @@ function TablesPilot({ token }: { token: string }) {
               </button>
             </header>
             <div className="tables-modal-body">
-              {modalOrders.length === 0 ? (
+              {modalHistoryLoading && modalOrders.length === 0 ? (
+                <p className="muted tables-modal-empty">Chargement des commandes…</p>
+              ) : modalOrders.length === 0 ? (
                 <p className="muted tables-modal-empty">
-                  Les commandes actives (nouvelle, en préparation, prête) apparaîtront ici. Rafraîchis si besoin.
+                  Les commandes du jour (y compris servies) apparaissent ici. Rafraîchis la page si besoin.
                 </p>
               ) : (
                 <ul className="tables-modal-order-list">
