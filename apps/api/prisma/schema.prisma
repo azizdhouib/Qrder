@@ -38,9 +38,18 @@ enum PaymentMethod {
 enum RestaurantVatMode {
   TTC_FR_10
   TTC_FR_20
+  TTC_FR_55
   VAT_EXEMPT_ART293B
 
   @@map("qr_restaurant_vat_mode")
+}
+
+enum OrderFulfillmentType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+
+  @@map("qr_order_fulfillment")
 }
 
 model Restaurant {
@@ -73,6 +82,7 @@ model Restaurant {
   items      MenuItem[]
   orders     Order[]
   bills      Bill[]
+  accountingAuditLogs AccountingAuditLog[]
 
   @@map("qr_restaurants")
 }
@@ -86,6 +96,7 @@ model User {
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   billsRegistered Bill[] @relation("BillRegisteredBy")
+  accountingAuditLogs AccountingAuditLog[]
 
   @@map("qr_users")
 }
@@ -186,6 +197,8 @@ model Order {
   customerName String?
   /// Nombre de couverts (optionnel).
   covers       Int?
+  /// Sur place / à emporter / livraison (export comptabilité).
+  fulfillmentType OrderFulfillmentType @default(DINE_IN)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @default(now()) @updatedAt
   /// Début du suivi « en cuisine » (fixé à la première entrée en PREPARING, effacé si retour en PLACED).
@@ -223,12 +236,33 @@ model Bill {
   registeredByLabel  String?
   discountCents      Int           @default(0)
   serviceFeeCents    Int           @default(0)
+  /// Pourboires (centimes) — saisie caisse ou intégration future.
+  tipCents           Int           @default(0)
+  /// Frais processeur (ex. Stripe), centimes — intégration future.
+  processorFeeCents  Int           @default(0)
   registeredByUserId String?
   registeredBy       User?         @relation("BillRegisteredBy", fields: [registeredByUserId], references: [id], onDelete: SetNull)
   orders             Order[]
 
   @@unique([restaurantId, invoiceNumber])
   @@map("qr_bills")
+}
+
+/// Journal pour export comptabilité / audits (extensions Sage, Pennylane, etc.).
+model AccountingAuditLog {
+  id             String     @id @default(cuid())
+  restaurantId   String
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action         String
+  entityType     String
+  entityId       String?
+  detail         String
+  createdAt      DateTime   @default(now())
+
+  @@index([restaurantId, createdAt])
+  @@map("qr_accounting_audit_logs")
 }
 
 model OrderItem {

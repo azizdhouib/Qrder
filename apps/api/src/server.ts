@@ -7,10 +7,12 @@ import express from "express";
 import QRCode from "qrcode";
 import { Server } from "socket.io";
 import type { Prisma } from "@prisma/client";
-import { OrderStatus, PaymentMethod, RestaurantVatMode, UserRole } from "@prisma/client";
+import { OrderFulfillmentType, OrderStatus, PaymentMethod, RestaurantVatMode, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { authRequired, requireRoles, signAuthToken } from "./auth.js";
 import { createAdminRouter } from "./adminRoutes.js";
+import { createAccountingRouter } from "./accounting/accountingRoutes.js";
+import { writeAccountingAudit } from "./accounting/auditLog.js";
 import { db } from "./db.js";
 
 const corsOrigins = (process.env.WEB_ORIGIN ?? "*")
@@ -78,6 +80,7 @@ app.get("/health", async (_req, res) => {
 });
 
 app.use("/admin", createAdminRouter());
+app.use("/accounting", createAccountingRouter());
 
 app.post("/auth/register", (_req, res) => {
   res.status(403).json({
@@ -798,6 +801,7 @@ app.post("/public/orders", async (req, res) => {
       notes: z.string().optional(),
       customerName: z.string().max(120).optional(),
       covers: z.number().int().min(1).max(99).optional(),
+      fulfillmentType: z.nativeEnum(OrderFulfillmentType).optional(),
       items: z.array(
         z.object({
           menuItemId: z.string().min(1),
@@ -865,6 +869,7 @@ app.post("/public/orders", async (req, res) => {
       notes: body.data.notes,
       customerName: body.data.customerName?.trim() || null,
       covers: body.data.covers ?? null,
+      fulfillmentType: body.data.fulfillmentType ?? OrderFulfillmentType.DINE_IN,
       items: {
         create: orderLines.map((line) => ({
           quantity: line.quantity,
@@ -1075,12 +1080,14 @@ app.post("/caisse/bills", authRequired, staffOnly, async (req, res) => {
     .object({
       tableId: z.string().min(1),
       orderIds: z.array(z.string()).min(1),
-      paymentMethod: z.nativeEnum(PaymentMethod)
+      paymentMethod: z.nativeEnum(PaymentMethod),
+      tipCents: z.number().int().min(0).max(99_999_999).optional(),
+      processorFeeCents: z.number().int().min(0).max(99_999_999).optional()
     })
     .safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: "Invalid payload" });
 
-  const { tableId, orderIds, paymentMethod } = body.data;
+  const { tableId, orderIds, paymentMethod, tipCents, processorFeeCents } = body.data;
   const rid = req.user!.restaurantId;
   const userId = req.user!.userId;
 
@@ -1139,7 +1146,9 @@ app.post("/caisse/bills", authRequired, staffOnly, async (req, res) => {
           registeredByUserId: userId,
           paymentReference,
           publicViewToken,
-          registeredByLabel
+          registeredByLabel,
+          tipCents: tipCents ?? 0,
+          processorFeeCents: processorFeeCents ?? 0
         }
       });
 
@@ -1162,6 +1171,15 @@ app.post("/caisse/bills", authRequired, staffOnly, async (req, res) => {
         where: { id: created.id },
         include: billInclude
       });
+    });
+
+    void writeAccountingAudit({
+      restaurantId: rid,
+      userId,
+      action: "BILL_CREATED",
+      entityType: "Bill",
+      entityId: bill.id,
+      detail: `Facture n° ${bill.invoiceNumber} — ${(bill.totalCents / 100).toFixed(2)} € — ${paymentMethod}`
     });
 
     res.status(201).json(bill);
@@ -1402,6 +1420,17 @@ app.patch("/kitchen/orders/:id/status", authRequired, async (req, res) => {
     data: { status: nextStatus, ...prepData },
     include: { table: true, items: { include: { options: true } } }
   });
+
+  if (prevStatus !== nextStatus) {
+    void writeAccountingAudit({
+      restaurantId: updated.restaurantId,
+      userId: req.user!.userId,
+      action: "ORDER_STATUS",
+      entityType: "Order",
+      entityId: orderId,
+      detail: `Commande #${updated.orderNumber} : ${prevStatus} → ${nextStatus}`
+    });
+  }
 
   io.to(`restaurant:${updated.restaurantId}`).emit("order.updated", updated);
   io.to(`order:${updated.id}`).emit("order.updated", { id: updated.id, status: updated.status });

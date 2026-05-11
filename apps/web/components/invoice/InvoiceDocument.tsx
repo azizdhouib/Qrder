@@ -129,7 +129,9 @@ export function InvoiceDocument({
         <span className="inv-badge inv-badge--muted">
           {bill.restaurant.vatMode === "VAT_EXEMPT_ART293B"
             ? "TVA — art. 293 B"
-            : `TVA ${vat.vatRatePercent}%`}
+            : vat.vatRatePercent != null
+              ? `TVA ${String(vat.vatRatePercent).replace(".", ",")} %`
+              : "TVA"}
         </span>
       </div>
 

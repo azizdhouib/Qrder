@@ -1,6 +1,6 @@
 /** Aligné sur la réponse API `GET /caisse/bills/:id` et `GET /public/bills/:token`. */
 
-export type InvoiceVatMode = "TTC_FR_10" | "TTC_FR_20" | "VAT_EXEMPT_ART293B";
+export type InvoiceVatMode = "TTC_FR_10" | "TTC_FR_20" | "TTC_FR_55" | "VAT_EXEMPT_ART293B";
 
 export type InvoicePaymentMethod = "CASH" | "CARD" | "OTHER";
 

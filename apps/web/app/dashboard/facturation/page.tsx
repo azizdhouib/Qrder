@@ -171,7 +171,7 @@ function FacturationForm({ token }: { token: string }) {
           <span>Mode TVA sur les prix (facture)</span>
           <select name="vatMode" className="facturation-input" defaultValue={r.vatMode}>
             <option value="TTC_FR_10">Prix TTC — TVA 10,0 % (restauration)</option>
-            <option value="TTC_FR_20">Prix TTC — TVA 20,0 %</option>
+            <option value="TTC_FR_55">Prix TTC — TVA 5,5 %</option>
             <option value="VAT_EXEMPT_ART293B">TVA non applicable — art. 293 B CGI</option>
           </select>
         </label>

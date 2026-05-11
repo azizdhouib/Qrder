@@ -45,7 +45,7 @@ export function splitVatFromBill(
     };
   }
 
-  const rate = vatMode === "TTC_FR_20" ? 0.2 : 0.1;
+  const rate = vatMode === "TTC_FR_20" ? 0.2 : vatMode === "TTC_FR_55" ? 0.055 : 0.1;
   const ttcAfter = totalTtcCents;
   const netHtCents = roundMoney(ttcAfter / (1 + rate));
   const tvaCents = Math.max(0, ttcAfter - netHtCents);

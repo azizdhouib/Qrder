@@ -73,8 +73,6 @@ export default function PublicMenuPage({
   const [placedTotal, setPlacedTotal] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetTab, setSheetTab] = useState<"nav" | "cart">("nav");
-  const [orderCustomerName, setOrderCustomerName] = useState("");
-  const [orderCovers, setOrderCovers] = useState("");
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [optionPickerItem, setOptionPickerItem] = useState<MenuItemRow | null>(null);
   const [optionPickerSelectedIds, setOptionPickerSelectedIds] = useState<string[]>([]);
@@ -159,10 +157,6 @@ export default function PublicMenuPage({
         optionIds: c.optionIds
       }))
     };
-    const name = orderCustomerName.trim();
-    if (name) payload.customerName = name;
-    const cov = parseInt(orderCovers.trim(), 10);
-    if (!Number.isNaN(cov) && cov >= 1 && cov <= 99) payload.covers = cov;
     const order = await apiFetch<{
       id: string;
       status: string;
@@ -584,30 +578,6 @@ export default function PublicMenuPage({
                     </li>
                   ))}
                 </ul>
-
-                <div className="mt-4 grid gap-3 rounded-2xl border border-border bg-secondary/40 p-4">
-                  <p className="text-[12px] font-medium text-muted-foreground">Sur place (optionnel, pour la note)</p>
-                  <label className="grid gap-1">
-                    <span className="text-[12px] text-muted-foreground">Nom</span>
-                    <input
-                      value={orderCustomerName}
-                      onChange={(e) => setOrderCustomerName(e.target.value)}
-                      maxLength={120}
-                      placeholder="ex. Martin"
-                      className="rounded-xl border border-border bg-card px-3 py-2 text-[14px] text-foreground outline-none ring-primary/25 focus:ring-2"
-                    />
-                  </label>
-                  <label className="grid gap-1">
-                    <span className="text-[12px] text-muted-foreground">Couverts</span>
-                    <input
-                      value={orderCovers}
-                      onChange={(e) => setOrderCovers(e.target.value.replace(/\D/g, "").slice(0, 2))}
-                      inputMode="numeric"
-                      placeholder="ex. 2"
-                      className="rounded-xl border border-border bg-card px-3 py-2 text-[14px] text-foreground outline-none ring-primary/25 focus:ring-2"
-                    />
-                  </label>
-                </div>
 
                 <div className="mt-4 border-t border-border pt-4">
                   <div className="flex items-baseline justify-between gap-4">

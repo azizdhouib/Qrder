@@ -111,7 +111,11 @@ function ComptaBody({ token }: { token: string }) {
           <h1 className="compta-title">Compta — encaissements</h1>
           <p className="compta-lead muted">
             Totaux issus des factures enregistrées en <Link href="/dashboard/caisse">caisse</Link> (hors commandes non
-            encaissées).
+            encaissées). Pour exports détaillés, TVA, ZIP factures et journal d&apos;audit :{" "}
+            <Link href="/dashboard/export-compta" className="link-inline">
+              Export compta
+            </Link>
+            .
           </p>
         </div>
         <div className="compta-periods" role="tablist" aria-label="Période">
