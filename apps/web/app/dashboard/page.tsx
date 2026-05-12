@@ -1,7 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import {
+  QrCode,
+  UtensilsCrossed,
+  ChefHat,
+  History,
+  RefreshCw,
+  TrendingUp,
+  Users,
+  ShoppingBag,
+  CheckCircle2,
+} from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 type Period = "day" | "week" | "month";
@@ -29,8 +40,6 @@ function startOfLocalDay(d: Date) {
   x.setHours(0, 0, 0, 0);
   return x;
 }
-
-/** Semaine calendaire commençant lundi (usage France). */
 function startOfWeekMonday(d: Date) {
   const x = new Date(d);
   const day = x.getDay();
@@ -39,12 +48,10 @@ function startOfWeekMonday(d: Date) {
   x.setHours(0, 0, 0, 0);
   return x;
 }
-
 function startOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
 }
-
-function rangeForPeriod(period: Period): { from: Date; to: Date } {
+function rangeForPeriod(period: Period) {
   const now = new Date();
   if (period === "day") return { from: startOfLocalDay(now), to: now };
   if (period === "week") return { from: startOfWeekMonday(now), to: now };
@@ -60,16 +67,47 @@ const STATUS_FR: Record<string, string> = {
   PREPARING: "En préparation",
   READY: "Prêt",
   SERVED: "Servi",
-  CANCELLED: "Annulé"
+  CANCELLED: "Annulé",
 };
+
+const STATUS_COLOR: Record<string, string> = {
+  PLACED: "var(--status-placed, #f59e0b)",
+  PREPARING: "var(--status-preparing, #3b82f6)",
+  READY: "var(--status-ready, #10b981)",
+  SERVED: "var(--status-served, #6366f1)",
+  CANCELLED: "var(--status-cancelled, #ef4444)",
+};
+
+const ACTIONS = [
+  {
+    href: "/dashboard/tables",
+    icon: QrCode,
+    title: "Tables + QR codes",
+    desc: "Créer les tables, générer et télécharger les QR codes par salle.",
+  },
+  {
+    href: "/dashboard/menu",
+    icon: UtensilsCrossed,
+    title: "Gestion du menu",
+    desc: "Configurer catégories, plats, prix et options.",
+  },
+  {
+    href: "/dashboard/kitchen",
+    icon: ChefHat,
+    title: "Écran cuisine (KDS)",
+    desc: "Vue cuisine en temps réel — commandes, temps, tables.",
+  },
+  {
+    href: "/dashboard/history",
+    icon: History,
+    title: "Historique",
+    desc: "Parcourir et filtrer toutes les commandes passées.",
+  },
+] as const;
 
 export default function DashboardPage() {
   return (
     <main className="container stack">
-      <section className="hero">
-        <span className="badge">Vue d&apos;ensemble</span>
-        <h1 className="hero-title">Pilotage</h1>
-      </section>
       <DashboardAnalyticsLoader />
     </main>
   );
@@ -82,9 +120,7 @@ function DashboardAnalyticsLoader() {
     setToken(localStorage.getItem("qrder_token") ?? "");
   }, []);
 
-  if (token === undefined) {
-    return <p className="muted">Chargement…</p>;
-  }
+  if (token === undefined) return null;
 
   if (!token) {
     return (
@@ -99,14 +135,16 @@ function DashboardAnalyticsLoader() {
     );
   }
 
-  return <DashboardAnalytics token={token} />;
+  return <DashboardOverview token={token} />;
 }
 
-function DashboardAnalytics({ token }: { token: string }) {
+function DashboardOverview({ token }: { token: string }) {
   const [period, setPeriod] = useState<Period>("day");
   const [data, setData] = useState<AnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [spinning, setSpinning] = useState(false);
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { from, to } = useMemo(() => rangeForPeriod(period), [period]);
 
@@ -116,7 +154,7 @@ function DashboardAnalytics({ token }: { token: string }) {
     try {
       const qs = `?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`;
       const res = await apiFetch<AnalyticsResponse>(`/dashboard/analytics${qs}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       setData(res);
     } catch (e) {
@@ -131,175 +169,215 @@ function DashboardAnalytics({ token }: { token: string }) {
     load().catch(() => {});
   }, [load]);
 
+  const handleRefresh = useCallback(() => {
+    setSpinning(true);
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => setSpinning(false), 700);
+    load().catch(() => {});
+  }, [load]);
+
   const periodLabel =
     period === "day" ? "Aujourd'hui" : period === "week" ? "Cette semaine" : "Ce mois";
 
-  const rangeFormatter = useMemo(
-    () =>
-      new Intl.DateTimeFormat("fr-FR", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: period === "month" ? undefined : "2-digit",
-        minute: period === "month" ? undefined : "2-digit"
-      }),
-    [period]
+  const maxTopQty = useMemo(
+    () => Math.max(...(data?.topItems.map((i) => i.quantitySold) ?? []), 1),
+    [data]
+  );
+
+  const totalByStatus = useMemo(
+    () => data?.byStatus.reduce((s, r) => s + r.count, 0) ?? 0,
+    [data]
   );
 
   return (
-    <div className="stack dashboard-analytics">
-      <div className="menu-tabs analytics-period-tabs" role="tablist" aria-label="Periode">
-        {(
-          [
-            ["day", "Aujourd'hui"],
-            ["week", "Cette semaine"],
-            ["month", "Ce mois"]
-          ] as const
-        ).map(([p, label]) => (
+    <div className="ov-root stack">
+
+      {/* ── Header ── */}
+      <div className="ov-header">
+        <div className="ov-header-left">
+          <span className="badge">Vue d&apos;ensemble</span>
+          <h1 className="ov-title">Pilotage</h1>
+          <p className="ov-subtitle muted">{periodLabel}</p>
+        </div>
+        <div className="ov-period-bar" role="tablist" aria-label="Période">
+          {(
+            [
+              ["day", "Aujourd'hui"],
+              ["week", "Cette semaine"],
+              ["month", "Ce mois"],
+            ] as const
+          ).map(([p, label]) => (
+            <button
+              key={p}
+              type="button"
+              role="tab"
+              aria-selected={period === p}
+              className={`menu-tab${period === p ? " menu-tab-active" : ""}`}
+              onClick={() => setPeriod(p)}
+            >
+              {label}
+            </button>
+          ))}
           <button
-            key={p}
             type="button"
-            role="tab"
-            aria-selected={period === p}
-            className={`menu-tab${period === p ? " menu-tab-active" : ""}`}
-            onClick={() => setPeriod(p)}
+            className="ov-refresh-btn"
+            onClick={handleRefresh}
+            aria-label="Rafraîchir"
+            title="Rafraîchir"
           >
-            {label}
+            <RefreshCw size={15} className={spinning ? "ov-spin" : ""} strokeWidth={2} />
           </button>
-        ))}
-        <button type="button" className="btn-secondary btn-compact menu-tab-refresh" onClick={() => load()}>
-          Rafraîchir
-        </button>
+        </div>
       </div>
 
       {err && (
         <div className="panel pill-inactive">
-          <p className="muted" style={{ margin: 0 }}>
-            {err}
-          </p>
+          <p className="muted" style={{ margin: 0 }}>{err}</p>
         </div>
       )}
 
-      {loading && !data && <p className="muted">Chargement…</p>}
+      {loading && !data && (
+        <div className="ov-skeleton-strip" aria-hidden="true">
+          {[1, 2, 3, 4].map((n) => (
+            <div key={n} className="ov-skeleton-cell" />
+          ))}
+        </div>
+      )}
 
       {data && (
         <>
-          <p className="muted analytics-range-caption">
-            <strong>{periodLabel}</strong> — du {rangeFormatter.format(new Date(data.from))} au{" "}
-            {rangeFormatter.format(new Date(data.to))}
-          </p>
+          {/* ── KPI strip ── */}
+          <ul className="ov-kpi-strip" aria-label="Indicateurs clés">
+            <li className="ov-kpi">
+              <TrendingUp className="ov-kpi-icon" size={18} strokeWidth={1.75} aria-hidden />
+              <span className="ov-kpi-val">{formatEur(data.revenueCents)}</span>
+              <span className="ov-kpi-label">Chiffre d&apos;affaires</span>
+            </li>
+            <li className="ov-kpi">
+              <ShoppingBag className="ov-kpi-icon" size={18} strokeWidth={1.75} aria-hidden />
+              <span className="ov-kpi-val">{data.orderCount}</span>
+              <span className="ov-kpi-label">Commandes</span>
+            </li>
+            <li className="ov-kpi">
+              <Users className="ov-kpi-icon" size={18} strokeWidth={1.75} aria-hidden />
+              <span className="ov-kpi-val">{data.distinctTablesWithOrders}</span>
+              <span className="ov-kpi-label">Tables actives</span>
+            </li>
+            <li className="ov-kpi">
+              <CheckCircle2 className="ov-kpi-icon" size={18} strokeWidth={1.75} aria-hidden />
+              <span className="ov-kpi-val">
+                {data.servedRate != null
+                  ? `${(data.servedRate * 100).toFixed(0)} %`
+                  : "—"}
+              </span>
+              <span className="ov-kpi-label">Taux de service</span>
+            </li>
+          </ul>
 
-          <div className="grid grid-2 analytics-kpi-grid">
-            <div className="panel analytics-kpi">
-              <p className="analytics-kpi-label">Chiffre d&apos;affaires</p>
-              <p className="analytics-kpi-value">{formatEur(data.revenueCents)}</p>
-            </div>
-            <div className="panel analytics-kpi">
-              <p className="analytics-kpi-label">Commandes</p>
-              <p className="analytics-kpi-value">{data.orderCount}</p>
-            </div>
-            <div className="panel analytics-kpi">
-              <p className="analytics-kpi-label">Panier moyen</p>
-              <p className="analytics-kpi-value">{formatEur(data.averageBasketCents)}</p>
-            </div>
-            <div className="panel analytics-kpi">
-              <p className="analytics-kpi-label">Tables actives</p>
-              <p className="analytics-kpi-value">{data.distinctTablesWithOrders}</p>
-            </div>
-          </div>
+          {/* ── Body grid ── */}
+          <div className="ov-body-grid">
 
-          <div className="grid grid-2">
-            <div className="panel">
-              <h3 className="panel-title">Service &amp; annulations</h3>
-              <ul className="analytics-metric-list">
-                <li>
-                  <span className="muted">Commandes servies</span>
-                  <strong>{data.servedOrders}</strong>
-                </li>
-                <li>
-                  <span className="muted">Taux de service</span>
-                  <strong>
-                    {data.servedRate != null ? `${(data.servedRate * 100).toFixed(1)} %` : "—"}
-                  </strong>
-                </li>
-                <li>
-                  <span className="muted">Annulations</span>
-                  <strong>{data.cancelledOrders}</strong>
-                </li>
-              </ul>
+            {/* Top articles */}
+            <div className="panel ov-panel">
+              <h2 className="panel-title ov-panel-title">Top articles</h2>
+              {data.topItems.length === 0 ? (
+                <p className="muted">Aucune vente sur cette période.</p>
+              ) : (
+                <ol className="ov-top-list">
+                  {data.topItems.slice(0, 8).map((item, i) => (
+                    <li key={`${item.name}-${i}`} className="ov-top-item">
+                      <div className="ov-top-meta">
+                        <span className="ov-top-rank">{i + 1}</span>
+                        <span className="ov-top-name">{item.name}</span>
+                        <span className="ov-top-figures muted">
+                          {item.quantitySold}&times; &middot; {formatEur(item.revenueCents)}
+                        </span>
+                      </div>
+                      <div className="ov-top-bar-track" aria-hidden>
+                        <div
+                          className="ov-top-bar-fill"
+                          style={{ width: `${(item.quantitySold / maxTopQty) * 100}%` }}
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </div>
-            <div className="panel">
-              <h3 className="panel-title">Répartition par statut</h3>
+
+            {/* Répartition statuts */}
+            <div className="panel ov-panel">
+              <h2 className="panel-title ov-panel-title">Flux des commandes</h2>
               {data.byStatus.length === 0 ? (
                 <p className="muted">Aucune commande sur cette période.</p>
               ) : (
-                <ul className="analytics-status-list">
+                <ul className="ov-status-list">
                   {data.byStatus
                     .slice()
                     .sort((a, b) => b.count - a.count)
-                    .map((row) => (
-                      <li key={row.status}>
-                        <span className={`status ${statusClass(row.status)}`}>
-                          {STATUS_FR[row.status] ?? row.status}
-                        </span>
-                        <span className="analytics-status-count tabular-nums">{row.count}</span>
-                      </li>
-                    ))}
+                    .map((row) => {
+                      const pct = totalByStatus > 0 ? (row.count / totalByStatus) * 100 : 0;
+                      return (
+                        <li key={row.status} className="ov-status-row">
+                          <div className="ov-status-row-top">
+                            <span
+                              className="ov-status-dot"
+                              style={{ background: STATUS_COLOR[row.status] ?? "#888" }}
+                              aria-hidden
+                            />
+                            <span className="ov-status-name">
+                              {STATUS_FR[row.status] ?? row.status}
+                            </span>
+                            <span className="ov-status-count tabular-nums">{row.count}</span>
+                            <span className="ov-status-pct muted tabular-nums">
+                              {pct.toFixed(0)} %
+                            </span>
+                          </div>
+                          <div className="ov-status-bar-track" aria-hidden>
+                            <div
+                              className="ov-status-bar-fill"
+                              style={{
+                                width: `${pct}%`,
+                                background: STATUS_COLOR[row.status] ?? "#888",
+                              }}
+                            />
+                          </div>
+                        </li>
+                      );
+                    })}
                 </ul>
               )}
-            </div>
-          </div>
 
-          <div className="panel">
-            <h3 className="panel-title">Top articles</h3>
-            {data.topItems.length === 0 ? (
-              <p className="muted">Aucune vente sur cette période.</p>
-            ) : (
-              <ol className="analytics-top-list">
-                {data.topItems.map((item, i) => (
-                  <li key={`${item.name}-${i}`}>
-                    <span className="analytics-top-name">{item.name}</span>
-                    <span className="muted analytics-top-meta">
-                      {item.quantitySold} vendus · {formatEur(item.revenueCents)}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            )}
+              {/* Panier moyen en bas du panel */}
+              <div className="ov-basket-row">
+                <span className="muted">Panier moyen</span>
+                <strong>{formatEur(data.averageBasketCents)}</strong>
+              </div>
+            </div>
+
           </div>
         </>
       )}
 
-      <section>
-        <h2 className="section-title">Accès rapides</h2>
-        <div className="grid grid-2">
-          <a className="link-card" href="/dashboard/tables">
-            <p className="section-title">Tables + QR</p>
-            <p className="muted">Créer les tables, générer et télécharger les QR codes.</p>
-          </a>
-          <a className="link-card" href="/dashboard/menu">
-            <p className="section-title">Gestion menu</p>
-            <p className="muted">Configurer catégories, plats, prix et options.</p>
-          </a>
-          <a className="link-card" href="/dashboard/kitchen">
-            <p className="section-title">Écran cuisine (KDS)</p>
-            <p className="muted">Affichage cuisine type KDS, pensé tablette : commandes, temps, tables, options.</p>
-          </a>
-          <a className="link-card" href="/dashboard/history">
-            <p className="section-title">Historique</p>
-            <p className="muted">Parcourir toutes les commandes détaillées.</p>
-          </a>
+      {/* ── Actions rapides ── */}
+      <section className="ov-actions-section">
+        <h2 className="ov-actions-title">Accès rapides</h2>
+        <div className="ov-actions-grid">
+          {ACTIONS.map(({ href, icon: Icon, title, desc }) => (
+            <Link key={href} href={href} className="ov-action-card">
+              <span className="ov-action-icon-wrap" aria-hidden>
+                <Icon size={22} strokeWidth={1.75} />
+              </span>
+              <div className="ov-action-body">
+                <p className="ov-action-title">{title}</p>
+                <p className="ov-action-desc muted">{desc}</p>
+              </div>
+              <span className="ov-action-arrow" aria-hidden>→</span>
+            </Link>
+          ))}
         </div>
       </section>
+
     </div>
   );
-}
-
-function statusClass(status: string) {
-  if (status === "PLACED") return "status-placed";
-  if (status === "PREPARING") return "status-preparing";
-  if (status === "READY") return "status-ready";
-  if (status === "SERVED") return "status-served";
-  if (status === "CANCELLED") return "status-cancelled";
-  return "status-served";
 }

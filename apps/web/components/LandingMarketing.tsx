@@ -96,8 +96,8 @@ export default function LandingMarketing() {
           </Link>
           <nav className="ap-nav-links" aria-label="Navigation principale">
             <a href="#offre">Fonctionnement</a>
-            <a href="#demo">Démo</a>
             <a href="#resultats">Résultats</a>
+            <Link href="/demo" className="ap-nav-demo-link">Démo</Link>
           </nav>
           <Link href="/dashboard/auth" className="ap-btn ap-btn--filled ap-btn--sm">
             Espace équipe
