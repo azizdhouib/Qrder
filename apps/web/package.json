@@ -10,6 +10,7 @@
   "dependencies": {
     "dotenv": "^17.4.2",
     "html2canvas": "^1.4.1",
+    "idb": "^8.0.3",
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",
     "jszip": "^3.10.1",

@@ -74,9 +74,23 @@ function normalizeMenuItemTags(raw: string[] | undefined): string[] {
   return out;
 }
 
+function isPrismaDbUnreachable(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const code = (err as { code?: string }).code;
+  return code === "P1001" || code === "P1002" || code === "P1017";
+}
+
 app.get("/health", async (_req, res) => {
-  await db.$queryRaw`SELECT 1`;
-  res.json({ ok: true });
+  try {
+    await db.$queryRaw`SELECT 1`;
+    res.json({ ok: true });
+  } catch (err) {
+    if (isPrismaDbUnreachable(err)) {
+      return res.status(503).json({ ok: false, message: "Base de données injoignable" });
+    }
+    console.error("GET /health:", err);
+    return res.status(500).json({ ok: false, message: "Erreur serveur" });
+  }
 });
 
 app.use("/admin", createAdminRouter());
@@ -101,36 +115,48 @@ app.post("/auth/login", async (req, res) => {
     return res.status(400).json({ message: "Invalid payload" });
   }
 
-  const user = await db.user.findUnique({
-    where: { email: body.data.email.toLowerCase() },
-    include: { restaurant: true }
-  });
-  if (!user) return res.status(401).json({ message: "Invalid credentials" });
-
-  const isValid = await bcrypt.compare(body.data.password, user.passwordHash);
-  if (!isValid) return res.status(401).json({ message: "Invalid credentials" });
-
-  if (user.restaurant.suspended) {
-    return res.status(403).json({
-      message: "Cet établissement est suspendu. Contacte l’administrateur Qrder."
+  try {
+    const user = await db.user.findUnique({
+      where: { email: body.data.email.toLowerCase() },
+      include: { restaurant: true }
     });
-  }
+    if (!user) return res.status(401).json({ message: "Invalid credentials" });
 
-  const token = signAuthToken({
-    userId: user.id,
-    restaurantId: user.restaurantId,
-    role: user.role
-  });
+    const isValid = await bcrypt.compare(body.data.password, user.passwordHash);
+    if (!isValid) return res.status(401).json({ message: "Invalid credentials" });
 
-  return res.json({
-    token,
-    role: user.role,
-    restaurant: {
-      id: user.restaurant.id,
-      name: user.restaurant.name,
-      slug: user.restaurant.slug
+    if (user.restaurant.suspended) {
+      return res.status(403).json({
+        message: "Cet établissement est suspendu. Contacte l’administrateur Qrder."
+      });
     }
-  });
+
+    const token = signAuthToken({
+      userId: user.id,
+      restaurantId: user.restaurantId,
+      role: user.role
+    });
+
+    return res.json({
+      token,
+      role: user.role,
+      restaurant: {
+        id: user.restaurant.id,
+        name: user.restaurant.name,
+        slug: user.restaurant.slug
+      }
+    });
+  } catch (err) {
+    if (isPrismaDbUnreachable(err)) {
+      console.error("POST /auth/login: database unreachable", err);
+      return res.status(503).json({
+        message:
+          "Impossible de joindre la base de données (réseau ou Supabase). Vérifie ta connexion Internet et le statut du projet Supabase, puis réessaie."
+      });
+    }
+    console.error("POST /auth/login:", err);
+    return res.status(500).json({ message: "Erreur serveur" });
+  }
 });
 
 app.get("/me", authRequired, async (req, res) => {

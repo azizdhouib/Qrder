@@ -1,0 +1,19 @@
+{
+  "name": "Qrder",
+  "short_name": "Qrder",
+  "description": "SaaS QR ordering for restaurants",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f7",
+  "theme_color": "#f5f5f7",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/brand/qrder-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

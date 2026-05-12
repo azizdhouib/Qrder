@@ -6,6 +6,10 @@ import { io } from "socket.io-client";
 import { apiFetch, API_URL } from "@/lib/api";
 import { TokenGate } from "@/components/TokenGate";
 import { playKitchenNewOrderSound, primeKitchenAudio } from "@/lib/kitchenAlerts";
+import { snapshotGet, snapshotPut } from "@/lib/offline/db";
+import { kitchenOrdersSnapshotKey } from "@/lib/offline/snapshotKeys";
+import { enqueueKitchenStatusOffline } from "@/lib/offline/kitchenQueue";
+import { isLikelyNetworkFailure } from "@/lib/offline/network";
 
 type OrderStatus = "PLACED" | "PREPARING" | "READY" | "SERVED" | "CANCELLED";
 
@@ -393,32 +397,82 @@ function KitchenKdsScreen({ token }: { token: string }) {
     });
   }
 
-  async function load() {
-    const data = await apiFetch<KitchenOrder[]>(
-      `/kitchen/orders?includeRecentServed=true&recentMinutes=${KITCHEN_SERVED_VISIBLE_MINUTES}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    setOrders(
-      data.map((o) => ({
-        ...o,
-        preparingStartedAt: o.preparingStartedAt ?? null,
-        notes: o.notes ?? null,
-        items: (o.items ?? []).map((it) => ({
-          ...it,
-          options: Array.isArray(it.options) ? it.options : []
-        }))
+  function normalizeKitchenOrders(data: KitchenOrder[]): KitchenOrder[] {
+    return data.map((o) => ({
+      ...o,
+      preparingStartedAt: o.preparingStartedAt ?? null,
+      notes: o.notes ?? null,
+      items: (o.items ?? []).map((it) => ({
+        ...it,
+        options: Array.isArray(it.options) ? it.options : []
       }))
-    );
+    }));
+  }
+
+  async function load(shouldAbort?: () => boolean) {
+    try {
+      const data = await apiFetch<KitchenOrder[]>(
+        `/kitchen/orders?includeRecentServed=true&recentMinutes=${KITCHEN_SERVED_VISIBLE_MINUTES}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (shouldAbort?.()) return;
+      const normalized = normalizeKitchenOrders(data);
+      setOrders(normalized);
+      await snapshotPut(kitchenOrdersSnapshotKey(token), normalized).catch(() => {});
+    } catch (err) {
+      console.error(err);
+      if (shouldAbort?.()) return;
+      const cached = await snapshotGet<KitchenOrder[]>(kitchenOrdersSnapshotKey(token)).catch(() => null);
+      if (cached) setOrders(normalizeKitchenOrders(cached));
+    }
   }
 
   useEffect(() => {
-    load().catch(console.error);
+    let cancelled = false;
+    const shouldAbort = () => cancelled;
+    (async () => {
+      const snap = await snapshotGet<KitchenOrder[]>(kitchenOrdersSnapshotKey(token)).catch(() => null);
+      if (!cancelled && snap?.length) setOrders(normalizeKitchenOrders(snap));
+      await load(shouldAbort);
+    })().catch(console.error);
     apiFetch<{ id: string }>("/me/restaurant", { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => setRestaurantId(r.id))
       .catch(console.error);
     setDismissedServedIds(readDismissedServedIds());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (orders.length === 0) return;
+    const id = window.setTimeout(() => {
+      void snapshotPut(kitchenOrdersSnapshotKey(token), orders).catch(() => {});
+    }, 2500);
+    return () => {
+      window.clearTimeout(id);
+      const latest = ordersRef.current;
+      if (latest.length > 0) {
+        void snapshotPut(kitchenOrdersSnapshotKey(token), latest).catch(() => {});
+      }
+    };
+  }, [orders, token]);
+
+  /** Onglet restauré après mise en veille : réinjecter le snapshot si la mémoire React a été vidée. */
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState !== "visible") return;
+      if (typeof navigator !== "undefined" && navigator.onLine) return;
+      void snapshotGet<KitchenOrder[]>(kitchenOrdersSnapshotKey(token))
+        .then((c) => {
+          if (!c?.length) return;
+          setOrders((prev) => (prev.length === 0 ? normalizeKitchenOrders(c) : prev));
+        })
+        .catch(() => {});
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [token]);
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -580,9 +634,13 @@ function KitchenKdsScreen({ token }: { token: string }) {
       });
     } catch (err) {
       console.error(err);
-      flushSync(() => {
-        setOrders((prev) => prev.map((o) => (o.id === orderId ? previousOrder : o)));
-      });
+      if (isLikelyNetworkFailure(err)) {
+        void enqueueKitchenStatusOffline({ orderId, status, token });
+      } else {
+        flushSync(() => {
+          setOrders((prev) => prev.map((o) => (o.id === orderId ? previousOrder : o)));
+        });
+      }
     } finally {
       setPendingMoveIds((prev) => {
         const next = new Set(prev);

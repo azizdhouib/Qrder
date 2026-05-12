@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { io } from "socket.io-client";
 import { ChevronUp, Flame, Minus, Plus, X } from "lucide-react";
 import { API_URL, apiFetch } from "@/lib/api";
+import { snapshotGet, snapshotPut } from "@/lib/offline/db";
+import { publicMenuSnapshotKey } from "@/lib/offline/snapshotKeys";
 
 type MenuData = {
   restaurant: { name: string; slug: string };
@@ -65,6 +67,8 @@ export default function PublicMenuPage({
 }) {
   const [resolved, setResolved] = useState<{ restaurantSlug: string; tableToken: string } | null>(null);
   const [menu, setMenu] = useState<MenuData | null>(null);
+  const [menuFetchDone, setMenuFetchDone] = useState(false);
+  const [orderHint, setOrderHint] = useState<string | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [orderId, setOrderId] = useState<string>("");
   const [orderStatus, setOrderStatus] = useState<string>("");
@@ -83,9 +87,27 @@ export default function PublicMenuPage({
 
   useEffect(() => {
     if (!resolved) return;
-    apiFetch<MenuData>(`/public/r/${resolved.restaurantSlug}/t/${resolved.tableToken}/menu`)
-      .then(setMenu)
-      .catch(console.error);
+    let cancelled = false;
+    setMenuFetchDone(false);
+    (async () => {
+      try {
+        const m = await apiFetch<MenuData>(`/public/r/${resolved.restaurantSlug}/t/${resolved.tableToken}/menu`);
+        if (cancelled) return;
+        setMenu(m);
+        await snapshotPut(publicMenuSnapshotKey(resolved.restaurantSlug, resolved.tableToken), m).catch(() => {});
+      } catch (e) {
+        console.error(e);
+        const cached = await snapshotGet<MenuData>(
+          publicMenuSnapshotKey(resolved.restaurantSlug, resolved.tableToken)
+        ).catch(() => null);
+        if (!cancelled && cached) setMenu(cached);
+      } finally {
+        if (!cancelled) setMenuFetchDone(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [resolved]);
 
   useEffect(() => {
@@ -132,10 +154,24 @@ export default function PublicMenuPage({
     return optionPickerItem.priceCents + chosen.reduce((s, o) => s + o.priceDeltaCents, 0);
   }, [optionPickerItem, optionPickerSelectedIds]);
 
-  if (!menu || !resolved) {
+  if (!resolved) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background px-5">
         <p className="text-[15px] text-muted-foreground">Chargement du menu...</p>
+      </main>
+    );
+  }
+  if (!menuFetchDone) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background px-5">
+        <p className="text-[15px] text-muted-foreground">Chargement du menu...</p>
+      </main>
+    );
+  }
+  if (!menu) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background px-5">
+        <p className="text-[15px] text-muted-foreground">Menu indisponible sans connexion.</p>
       </main>
     );
   }
@@ -148,6 +184,11 @@ export default function PublicMenuPage({
 
   async function submitOrder() {
     if (!resolved) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setOrderHint("Connexion requise pour envoyer la commande à la cuisine.");
+      return;
+    }
+    setOrderHint(null);
     const payload: Record<string, unknown> = {
       restaurantSlug: resolved.restaurantSlug,
       tableToken: resolved.tableToken,
@@ -263,6 +304,14 @@ export default function PublicMenuPage({
         </h1>
         <p className="text-[15px] text-muted-foreground">Commandez depuis la table, en quelques gestes.</p>
       </header>
+
+      {orderHint ? (
+        <div className="mx-auto max-w-2xl px-5 pb-2" role="status">
+          <p className="rounded-2xl border border-border bg-card/80 px-4 py-3 text-[14px] leading-snug text-muted-foreground backdrop-blur-sm">
+            {orderHint}
+          </p>
+        </div>
+      ) : null}
 
       <div className="sticky top-0 z-30 border-b border-border glass">
         <div className="mx-auto flex max-w-2xl gap-2 overflow-x-auto px-5 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

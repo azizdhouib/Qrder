@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, ApiRequestError } from "@/lib/api";
+import {
+  clearCachedDashboardSession,
+  loadCachedDashboardSession,
+  saveCachedDashboardSession
+} from "@/lib/offline/dashboardSessionCache";
+import { isLikelyNetworkFailure, readNavigatorOnline } from "@/lib/offline/network";
 import { DashboardNav, type DashboardNavItem } from "@/components/DashboardNav";
 import { DashboardSessionBar } from "@/components/DashboardSessionBar";
 
@@ -46,7 +52,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const isAuthPage = useMemo(() => pathname === "/dashboard/auth", [pathname]);
   const navItems = useMemo(() => (session ? navForRole(session.role) : NAV_FULL), [session]);
 
-  useEffect(() => {
+  /** Lecture token avant paint pour éviter la course token=null + ready=true (écran vide hors ligne). */
+  useLayoutEffect(() => {
     const stored = localStorage.getItem("qrder_token");
     setToken(stored);
 
@@ -66,25 +73,79 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!token || isAuthPage) {
       setSession(null);
-      setSessionReady(true);
+      if (isAuthPage) {
+        setSessionReady(true);
+      } else if (!token) {
+        /* Token pas encore lu depuis localStorage : ne pas marquer « prêt » (sinon shell absent + enfants masqués). */
+        setSessionReady(false);
+      }
       return;
     }
 
     setSessionReady(false);
-    apiFetch<{ userId: string; role: UserRole; restaurant: { name: string } }>("/me", {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then((r) => {
-        setSession({ role: r.role, restaurantName: r.restaurant.name, userId: r.userId });
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const r = await apiFetch<{ userId: string; role: UserRole; restaurant: { name: string } }>("/me", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (cancelled) return;
+        const next = { role: r.role, restaurantName: r.restaurant.name, userId: r.userId };
+        setSession(next);
+        await saveCachedDashboardSession({
+          userId: next.userId,
+          role: next.role,
+          restaurantName: next.restaurantName
+        }).catch(() => {});
         setSessionReady(true);
-      })
-      .catch(() => {
-        localStorage.removeItem("qrder_token");
-        setToken(null);
-        setSession(null);
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof ApiRequestError && err.status === 401) {
+          await clearCachedDashboardSession().catch(() => {});
+          localStorage.removeItem("qrder_token");
+          setToken(null);
+          setSession(null);
+          setSessionReady(true);
+          router.replace("/dashboard/auth");
+          return;
+        }
+
+        const networkish = !readNavigatorOnline() || isLikelyNetworkFailure(err);
+        const cached = await loadCachedDashboardSession().catch(() => null);
+
+        if (cached?.userId && cached?.role && cached?.restaurantName) {
+          setSession({
+            userId: cached.userId,
+            role: cached.role,
+            restaurantName: cached.restaurantName
+          });
+          setSessionReady(true);
+          return;
+        }
+
+        if (networkish) {
+          setSession({
+            userId: "offline",
+            role: "OWNER",
+            restaurantName: "Hors ligne"
+          });
+          setSessionReady(true);
+          return;
+        }
+
+        setSession({
+          userId: "offline",
+          role: "OWNER",
+          restaurantName: "Qrder"
+        });
         setSessionReady(true);
-        router.replace("/dashboard/auth");
-      });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [token, isAuthPage, router]);
 
   useEffect(() => {
@@ -137,6 +198,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <DashboardSessionBar
                 showStaffSettings={session.role !== "KITCHEN"}
                 onLogout={() => {
+                  void clearCachedDashboardSession().catch(() => {});
                   localStorage.removeItem("qrder_token");
                   router.replace("/dashboard/auth");
                 }}

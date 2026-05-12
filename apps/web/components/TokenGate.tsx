@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 type Props = {
@@ -8,12 +8,24 @@ type Props = {
 };
 
 export function TokenGate({ children }: Props) {
-  const [token, setToken] = useState("");
+  /** `null` = lecture localStorage pas encore faite (évite « Session requise » un frame avant le token). */
+  const [token, setToken] = useState<string | null>(null);
 
-  useEffect(() => {
-    const current = localStorage.getItem("qrder_token");
-    if (current) setToken(current);
+  useLayoutEffect(() => {
+    try {
+      setToken(localStorage.getItem("qrder_token") ?? "");
+    } catch {
+      setToken("");
+    }
   }, []);
+
+  if (token === null) {
+    return (
+      <div className="panel token-gate-panel" aria-busy="true">
+        <p className="muted text-[15px]">Chargement de la session…</p>
+      </div>
+    );
+  }
 
   if (!token) {
     return (
