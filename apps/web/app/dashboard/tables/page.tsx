@@ -362,8 +362,8 @@ function TablesPilot({ token }: { token: string }) {
   const [roomDraftNames, setRoomDraftNames] = useState<Record<string, string>>({});
   const [roomsManageError, setRoomsManageError] = useState<string | null>(null);
   const [roomActionBusyId, setRoomActionBusyId] = useState<string | null>(null);
-  const [planZoomPct, setPlanZoomPct] = useState(PLAN_ZOOM_MIN_PCT);
-  const [cardScalePct, setCardScalePct] = useState(100);
+  const [planZoomPct, setPlanZoomPct] = useState(PLAN_ZOOM_MAX_PCT);
+  const [cardScalePct, setCardScalePct] = useState(80);
   const [addRoomModalOpen, setAddRoomModalOpen] = useState(false);
   const [addRoomName, setAddRoomName] = useState("");
   const [addRoomError, setAddRoomError] = useState<string | null>(null);
