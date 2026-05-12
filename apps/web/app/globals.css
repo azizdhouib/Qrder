@@ -9578,6 +9578,9 @@ html[data-theme="light"] .ap-value-card:hover { background: #f5f5f7; }
   initial-value: 264;
 }
 
+/* Hide global ThemeToggle on the demo — it's irrelevant and blocks the prev arrow */
+body:has(.dp-root) .theme-toggle { display: none !important; }
+
 /* ── Root shell ── */
 .dp-root {
   position: fixed;
