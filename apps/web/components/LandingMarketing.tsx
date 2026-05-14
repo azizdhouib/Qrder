@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LandingPhoneMock } from "@/components/LandingPhoneMock";
 import { QrderLogo } from "@/components/QrderLogo";
+import { PwaInstallButton } from "@/components/PwaInstallButton";
 
 const STATS = [
   { value: "3×", label: "plus de tables servies" },
@@ -223,6 +224,8 @@ export default function LandingMarketing() {
           <p className="ap-footer-copy">© {new Date().getFullYear()} Qrder</p>
         </div>
       </footer>
+
+      <PwaInstallButton />
     </main>
   );
 }
