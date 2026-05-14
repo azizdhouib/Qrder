@@ -9,7 +9,9 @@ import {
   AlertTriangle,
   Building2,
   Download,
+  Minus,
   Pencil,
+  Plus,
   QrCode,
   RefreshCw,
   X
@@ -58,11 +60,13 @@ type KitchenOrder = {
     id: string;
     nameSnapshot: string;
     quantity: number;
-    options: { id: string; nameSnapshot: string }[];
+    unitPriceCents?: number;
+    lineTotalCents?: number;
+    options: { id: string; nameSnapshot: string; priceDeltaCents?: number }[];
   }[];
 };
 
-const ORDER_STATUS_FR: Record<OrderStatus, string> = {
+const PREVIEW_ORDER_STATUS_FR: Record<OrderStatus, string> = {
   PLACED: "Nouvelle",
   PREPARING: "En préparation",
   READY: "Prête",
@@ -241,6 +245,43 @@ type QrSheetItem = {
   dataUrl: string;
 };
 
+/** Menu pour composer une commande depuis le plan tables (GET /menu/full). */
+type PilotMenuItem = {
+  id: string;
+  name: string;
+  priceCents: number;
+  isActive: boolean;
+  options: { id: string; name: string; priceDeltaCents: number }[];
+};
+
+type PilotMenuCategory = {
+  id: string;
+  name: string;
+  position?: number;
+  isActive: boolean;
+  items: PilotMenuItem[];
+};
+
+type TableDraftLine = {
+  key: string;
+  menuItemId: string;
+  name: string;
+  quantity: number;
+  optionIds: string[];
+  optionNames: string[];
+  unitPriceCents: number;
+};
+
+function optionIdsKey(optionIds: string[]): string {
+  if (optionIds.length === 0) return "";
+  return [...optionIds].sort().join("|");
+}
+
+function newDraftLineKey(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `dl-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 async function fetchQrBlob(tableId: string, token: string): Promise<Blob> {
   const response = await fetch(`${API_URL}/tables/${tableId}/qr`, {
     headers: { Authorization: `Bearer ${token}` }
@@ -347,6 +388,15 @@ function TablesPilot({ token }: { token: string }) {
   const [modalTable, setModalTable] = useState<Table | null>(null);
   const [modalHistoryOrders, setModalHistoryOrders] = useState<KitchenOrder[]>([]);
   const [modalHistoryLoading, setModalHistoryLoading] = useState(false);
+  const [tableMenuCategories, setTableMenuCategories] = useState<PilotMenuCategory[]>([]);
+  const [tableMenuLoading, setTableMenuLoading] = useState(false);
+  const [tableMenuError, setTableMenuError] = useState<string | null>(null);
+  const [tableDraftLines, setTableDraftLines] = useState<TableDraftLine[]>([]);
+  const [tableScrollCatId, setTableScrollCatId] = useState<string | null>(null);
+  const [tablePickerItem, setTablePickerItem] = useState<PilotMenuItem | null>(null);
+  const [tablePickerOptionIds, setTablePickerOptionIds] = useState<string[]>([]);
+  const [tableSendBusy, setTableSendBusy] = useState(false);
+  const [tableSendError, setTableSendError] = useState<string | null>(null);
   const [tablesEditMode, setTablesEditMode] = useState(false);
   const [manageTable, setManageTable] = useState<Table | null>(null);
   const [manageName, setManageName] = useState("");
@@ -629,6 +679,85 @@ function TablesPilot({ token }: { token: string }) {
   }, [modalTable, kitchenOrders, modalHistoryOrders]);
 
   const modalCanEncaisser = Boolean(modalTable && unpaidServedTableIds.has(modalTable.id));
+
+  const tableMenuActiveCategories = useMemo(() => {
+    return tableMenuCategories
+      .filter((c) => c.isActive)
+      .map((c) => ({
+        ...c,
+        items: (c.items ?? []).filter((it) => it.isActive)
+      }))
+      .filter((c) => c.items.length > 0)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || a.name.localeCompare(b.name, "fr"));
+  }, [tableMenuCategories]);
+
+  useEffect(() => {
+    if (!modalTable) {
+      setTableMenuCategories([]);
+      setTableMenuLoading(false);
+      setTableMenuError(null);
+      setTableDraftLines([]);
+      setTableScrollCatId(null);
+      setTablePickerItem(null);
+      setTablePickerOptionIds([]);
+      setTableSendError(null);
+      return;
+    }
+    let cancelled = false;
+    setTableMenuLoading(true);
+    setTableMenuError(null);
+    setTableDraftLines([]);
+    setTableScrollCatId(null);
+    setTablePickerItem(null);
+    setTablePickerOptionIds([]);
+    setTableSendError(null);
+    apiFetch<PilotMenuCategory[]>("/menu/full", { headers: { Authorization: `Bearer ${token}` } })
+      .then((rows) => {
+        if (cancelled) return;
+        setTableMenuCategories(Array.isArray(rows) ? rows : []);
+      })
+      .catch((e) => {
+        if (!cancelled) setTableMenuError(parseApiErrorMessage(e));
+      })
+      .finally(() => {
+        if (!cancelled) setTableMenuLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [modalTable, token]);
+
+  useEffect(() => {
+    if (tableMenuActiveCategories.length === 0) return;
+    const ok = tableScrollCatId && tableMenuActiveCategories.some((c) => c.id === tableScrollCatId);
+    if (!ok) setTableScrollCatId(tableMenuActiveCategories[0].id);
+  }, [tableMenuActiveCategories, tableScrollCatId]);
+
+  const tableDraftTotalCents = useMemo(
+    () => tableDraftLines.reduce((s, l) => s + l.unitPriceCents * l.quantity, 0),
+    [tableDraftLines]
+  );
+
+  const tableExistingOrdersTotalCents = useMemo(() => {
+    let s = 0;
+    for (const o of modalOrders) {
+      for (const it of o.items) {
+        const line =
+          typeof it.lineTotalCents === "number"
+            ? it.lineTotalCents
+            : typeof it.unitPriceCents === "number"
+              ? it.unitPriceCents * it.quantity
+              : 0;
+        s += line;
+      }
+    }
+    return s;
+  }, [modalOrders]);
+
+  const selectedTableMenuCategory = useMemo(
+    () => tableMenuActiveCategories.find((c) => c.id === tableScrollCatId) ?? null,
+    [tableMenuActiveCategories, tableScrollCatId]
+  );
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -1132,6 +1261,96 @@ function TablesPilot({ token }: { token: string }) {
       ? `${origin}/r/${restaurantSlug}/t/${modalTable.qrToken}`
       : null;
 
+  function selectTableMenuCategory(catId: string) {
+    setTableScrollCatId(catId);
+  }
+
+  function addProductToTableDraft(item: PilotMenuItem, sortedOptionIds: string[], optionNames: string[]) {
+    const chosen = item.options.filter((o) => sortedOptionIds.includes(o.id));
+    const unit = item.priceCents + chosen.reduce((s, o) => s + o.priceDeltaCents, 0);
+    const keySig = optionIdsKey(sortedOptionIds);
+    setTableDraftLines((prev) => {
+      const idx = prev.findIndex((l) => l.menuItemId === item.id && optionIdsKey(l.optionIds) === keySig);
+      if (idx >= 0) {
+        return prev.map((l, i) => (i === idx ? { ...l, quantity: l.quantity + 1 } : l));
+      }
+      return [
+        ...prev,
+        {
+          key: newDraftLineKey(),
+          menuItemId: item.id,
+          name: item.name,
+          quantity: 1,
+          optionIds: sortedOptionIds,
+          optionNames,
+          unitPriceCents: unit
+        }
+      ];
+    });
+  }
+
+  function openTableItemPicker(item: PilotMenuItem) {
+    if (item.options.length === 0) {
+      addProductToTableDraft(item, [], []);
+      return;
+    }
+    setTablePickerItem(item);
+    setTablePickerOptionIds([]);
+  }
+
+  function confirmTablePicker() {
+    if (!tablePickerItem) return;
+    const sorted = [...tablePickerOptionIds].sort();
+    const chosen = tablePickerItem.options.filter((o) => sorted.includes(o.id));
+    addProductToTableDraft(
+      tablePickerItem,
+      sorted,
+      chosen.map((o) => o.name)
+    );
+    setTablePickerItem(null);
+    setTablePickerOptionIds([]);
+  }
+
+  function bumpDraftLine(lineKey: string, delta: number) {
+    setTableDraftLines((prev) =>
+      prev
+        .map((l) => (l.key === lineKey ? { ...l, quantity: l.quantity + delta } : l))
+        .filter((l) => l.quantity > 0)
+    );
+  }
+
+  async function sendTableDraftToKitchen() {
+    if (!modalTable || !me || tableDraftLines.length === 0) return;
+    setTableSendBusy(true);
+    setTableSendError(null);
+    try {
+      await apiFetch("/public/orders", {
+        method: "POST",
+        body: JSON.stringify({
+          restaurantSlug: me.restaurant.slug,
+          tableToken: modalTable.qrToken,
+          items: tableDraftLines.map((l) => ({
+            menuItemId: l.menuItemId,
+            quantity: l.quantity,
+            optionIds: l.optionIds
+          }))
+        })
+      });
+      setTableDraftLines([]);
+      await load();
+    } catch (e) {
+      setTableSendError(parseApiErrorMessage(e));
+    } finally {
+      setTableSendBusy(false);
+    }
+  }
+
+  const tablePickerUnitCents = useMemo(() => {
+    if (!tablePickerItem) return 0;
+    const chosen = tablePickerItem.options.filter((o) => tablePickerOptionIds.includes(o.id));
+    return tablePickerItem.priceCents + chosen.reduce((s, o) => s + o.priceDeltaCents, 0);
+  }, [tablePickerItem, tablePickerOptionIds]);
+
   return (
     <div className="tables-pilot-stack">
       <header className="tables-pilot-header">
@@ -1388,7 +1607,7 @@ function TablesPilot({ token }: { token: string }) {
                     aria-label={
                       tablesEditMode
                         ? `Table ${table.name}, glisser pour déplacer ou clic court sans déplacer pour renommer ou supprimer`
-                        : `Table ${table.name}, voir les commandes`
+                        : `Table ${table.name}, composer une commande`
                     }
                   >
                     <div className="tables-floor-cell-main">
@@ -1413,7 +1632,7 @@ function TablesPilot({ token }: { token: string }) {
             onClick={() => setModalTable(null)}
           />
           <div
-            className="tables-modal-panel"
+            className="tables-modal-panel tables-modal-panel--composer"
             role="dialog"
             aria-modal="true"
             aria-labelledby="tables-modal-title"
@@ -1425,11 +1644,9 @@ function TablesPilot({ token }: { token: string }) {
                   Table {modalTable.name}
                 </h2>
                 <p className="tables-modal-sub muted">
-                  {modalHistoryLoading && modalOrders.length === 0
+                  {modalHistoryLoading
                     ? "Chargement des commandes…"
-                    : modalOrders.length === 0
-                      ? "Aucune commande sur cette table aujourd’hui."
-                      : `${modalOrders.length} commande${modalOrders.length > 1 ? "s" : ""} sur cette table`}
+                    : "À gauche : une catégorie à la fois. À droite : ce qui est déjà sur la table, puis ton brouillon avant envoi en cuisine."}
                 </p>
                 <div className="tables-modal-table-tools">
                   {modalClientUrl ? (
@@ -1438,7 +1655,7 @@ function TablesPilot({ token }: { token: string }) {
                       className="btn-secondary tables-modal-tool-btn"
                       onClick={() => window.open(modalClientUrl, "_blank", "noopener,noreferrer")}
                     >
-                      Ouvrir l’interface client
+                      Interface client
                     </button>
                   ) : null}
                   <button
@@ -1446,7 +1663,7 @@ function TablesPilot({ token }: { token: string }) {
                     className="btn-secondary tables-modal-tool-btn"
                     onClick={() => void downloadQr(modalTable.id, modalTable.name, token)}
                   >
-                    Télécharger le QR
+                    QR code
                   </button>
                   {modalCanEncaisser ? (
                     <Link
@@ -1468,53 +1685,271 @@ function TablesPilot({ token }: { token: string }) {
                 <X size={20} strokeWidth={2} aria-hidden />
               </button>
             </header>
-            <div className="tables-modal-body">
-              {modalHistoryLoading && modalOrders.length === 0 ? (
-                <p className="muted tables-modal-empty">Chargement des commandes…</p>
-              ) : modalOrders.length === 0 ? (
-                <p className="muted tables-modal-empty">
-                  Les commandes du jour (y compris servies) apparaissent ici. Rafraîchis la page si besoin.
-                </p>
-              ) : (
-                <ul className="tables-modal-order-list">
-                  {modalOrders.map((order) => (
-                    <li key={order.id} className="tables-modal-order panel">
-                      <div className="tables-modal-order-top">
-                        <span className="tables-modal-order-num">#{order.orderNumber}</span>
-                        <span className={`status kitchen-order-status ${statusClass(order.status)}`}>
-                          {ORDER_STATUS_FR[order.status]}
-                        </span>
-                      </div>
-                      <p className="tables-modal-order-time muted">
-                        {new Date(order.createdAt).toLocaleString("fr-FR", {
-                          dateStyle: "short",
-                          timeStyle: "short"
-                        })}
-                      </p>
-                      {order.notes?.trim() ? (
-                        <p className="tables-modal-notes">
-                          <span className="muted">Note</span> {order.notes.trim()}
-                        </p>
+            <div className="tables-modal-composer-body">
+              <div className="tables-modal-composer-menu">
+                {tableMenuLoading ? (
+                  <p className="muted tables-modal-composer-hint">Chargement du menu…</p>
+                ) : tableMenuError ? (
+                  <p className="tables-modal-composer-error" role="alert">
+                    {tableMenuError}
+                  </p>
+                ) : tableMenuActiveCategories.length === 0 ? (
+                  <p className="muted tables-modal-composer-hint">
+                    Aucun plat actif dans le menu. Configure le menu dans l’onglet « Menu ».
+                  </p>
+                ) : (
+                  <>
+                    <nav className="tables-modal-composer-cats" aria-label="Catégories du menu">
+                      {tableMenuActiveCategories.map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          className={`tables-modal-cat-chip${tableScrollCatId === cat.id ? " tables-modal-cat-chip--active" : ""}`}
+                          onClick={() => selectTableMenuCategory(cat.id)}
+                        >
+                          {cat.name}
+                        </button>
+                      ))}
+                    </nav>
+                    <div className="tables-modal-composer-scroll">
+                      {selectedTableMenuCategory ? (
+                        <div className="tables-modal-composer-single-cat">
+                          <h3 className="tables-modal-composer-cat-title">{selectedTableMenuCategory.name}</h3>
+                          <div className="tables-modal-prod-grid">
+                            {selectedTableMenuCategory.items.map((item) => (
+                              <button
+                                key={item.id}
+                                type="button"
+                                className="tables-modal-prod-chip"
+                                onClick={() => openTableItemPicker(item)}
+                              >
+                                <span className="tables-modal-prod-chip-name">{item.name}</span>
+                                <span className="tables-modal-prod-chip-row">
+                                  <span className="tables-modal-prod-chip-price tabular-nums">
+                                    {formatEur(item.priceCents)}
+                                  </span>
+                                  {item.options.length > 0 ? (
+                                    <span className="tables-modal-prod-chip-opt-hint">options</span>
+                                  ) : null}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       ) : null}
-                      <ul className="tables-modal-lines">
-                        {order.items.map((it) => (
-                          <li key={it.id}>
-                            <span className="tabular-nums">{it.quantity}×</span> {it.nameSnapshot}
-                            {it.options.length > 0 ? (
-                              <ul className="tables-modal-options muted">
-                                {it.options.map((opt) => (
-                                  <li key={opt.id}>+ {opt.nameSnapshot}</li>
-                                ))}
-                              </ul>
-                            ) : null}
-                          </li>
-                        ))}
-                      </ul>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                    </div>
+                  </>
+                )}
+              </div>
+              <aside className="tables-modal-composer-preview" aria-label="Contenu de la table">
+                <p className="tables-modal-preview-eyebrow">Écran table</p>
+                <div className="tables-modal-preview-frame">
+                  <div className="tables-modal-preview-frame-head">
+                    <span className="tables-modal-preview-dot" aria-hidden />
+                    <span className="tables-modal-preview-dot" aria-hidden />
+                    <span className="tables-modal-preview-dot" aria-hidden />
+                  </div>
+                  <p className="tables-modal-preview-table-name">{modalTable.name}</p>
+                  <div className="tables-modal-preview-lines-wrap">
+                    {modalHistoryLoading && modalOrders.length === 0 ? (
+                      <p className="tables-modal-preview-empty muted">Chargement des commandes…</p>
+                    ) : modalOrders.length === 0 && tableDraftLines.length === 0 ? (
+                      <p className="tables-modal-preview-empty muted">
+                        Aucune commande sur cette table pour l’instant. Ajoute des produits depuis la gauche.
+                      </p>
+                    ) : (
+                      <div className="tables-modal-preview-stack">
+                        {modalOrders.length > 0 ? (
+                          <div className="tables-modal-preview-section">
+                            <p className="tables-modal-preview-section-label">Déjà commandé</p>
+                            {modalOrders.map((order) => (
+                              <div key={order.id} className="tables-modal-preview-order-block">
+                                <p className="tables-modal-preview-order-meta muted">
+                                  #{order.orderNumber} · {PREVIEW_ORDER_STATUS_FR[order.status]} ·{" "}
+                                  {new Date(order.createdAt).toLocaleTimeString("fr-FR", {
+                                    hour: "2-digit",
+                                    minute: "2-digit"
+                                  })}
+                                </p>
+                                <ul className="tables-modal-preview-order-lines">
+                                  {order.items.map((it) => {
+                                    const lineTotal =
+                                      typeof it.lineTotalCents === "number"
+                                        ? it.lineTotalCents
+                                        : typeof it.unitPriceCents === "number"
+                                          ? it.unitPriceCents * it.quantity
+                                          : null;
+                                    return (
+                                      <li key={it.id} className="tables-modal-preview-order-line">
+                                        <div className="tables-modal-preview-line-main">
+                                          <span className="tables-modal-preview-line-qty tabular-nums">
+                                            {it.quantity}×
+                                          </span>
+                                          <span className="tables-modal-preview-line-name">{it.nameSnapshot}</span>
+                                        </div>
+                                        {it.options.length > 0 ? (
+                                          <p className="tables-modal-preview-line-opts muted">
+                                            {it.options.map((o) => o.nameSnapshot).join(" · ")}
+                                          </p>
+                                        ) : null}
+                                        {lineTotal != null ? (
+                                          <p className="tables-modal-preview-order-line-price tabular-nums muted">
+                                            {formatEur(lineTotal)}
+                                          </p>
+                                        ) : null}
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                        {tableDraftLines.length > 0 ? (
+                          <div className="tables-modal-preview-section tables-modal-preview-section--draft">
+                            <p className="tables-modal-preview-section-label">À envoyer en cuisine</p>
+                            <ul className="tables-modal-preview-lines">
+                              {tableDraftLines.map((line) => (
+                                <li key={line.key} className="tables-modal-preview-line">
+                                  <div className="tables-modal-preview-line-main">
+                                    <span className="tables-modal-preview-line-qty tabular-nums">{line.quantity}×</span>
+                                    <span className="tables-modal-preview-line-name">{line.name}</span>
+                                  </div>
+                                  {line.optionNames.length > 0 ? (
+                                    <p className="tables-modal-preview-line-opts muted">
+                                      {line.optionNames.join(" · ")}
+                                    </p>
+                                  ) : null}
+                                  <div className="tables-modal-preview-line-row">
+                                    <span className="tabular-nums">{formatEur(line.unitPriceCents * line.quantity)}</span>
+                                    <span className="tables-modal-preview-line-actions">
+                                      <button
+                                        type="button"
+                                        className="tables-modal-qty-btn"
+                                        aria-label="Diminuer"
+                                        onClick={() => bumpDraftLine(line.key, -1)}
+                                      >
+                                        <Minus size={14} strokeWidth={2.5} aria-hidden />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="tables-modal-qty-btn"
+                                        aria-label="Augmenter"
+                                        onClick={() => bumpDraftLine(line.key, 1)}
+                                      >
+                                        <Plus size={14} strokeWidth={2.5} aria-hidden />
+                                      </button>
+                                    </span>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                  <div className="tables-modal-preview-footer tables-modal-preview-footer--split">
+                    <div className="tables-modal-preview-footer-row">
+                      <span className="tables-modal-preview-total-label">Sur la table</span>
+                      <span className="tables-modal-preview-total-value tabular-nums">
+                        {formatEur(tableExistingOrdersTotalCents)}
+                      </span>
+                    </div>
+                    <div className="tables-modal-preview-footer-row">
+                      <span className="tables-modal-preview-total-label">Brouillon</span>
+                      <span className="tables-modal-preview-total-value tabular-nums">
+                        {formatEur(tableDraftTotalCents)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                {tableSendError ? (
+                  <p className="tables-modal-send-error" role="alert">
+                    {tableSendError}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn-primary-ios tables-modal-send-kitchen"
+                  disabled={tableDraftLines.length === 0 || tableSendBusy || !me}
+                  onClick={() => void sendTableDraftToKitchen()}
+                >
+                  {tableSendBusy ? "Envoi…" : "Envoyer en cuisine"}
+                </button>
+              </aside>
             </div>
+
+            {tablePickerItem ? (
+              <div
+                className="tables-picker-overlay"
+                role="presentation"
+                onClick={() => {
+                  setTablePickerItem(null);
+                  setTablePickerOptionIds([]);
+                }}
+              >
+                <div
+                  className="tables-picker-sheet panel"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="tables-picker-title"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="tables-picker-head">
+                    <h3 id="tables-picker-title" className="tables-picker-title">
+                      {tablePickerItem.name}
+                    </h3>
+                    <button
+                      type="button"
+                      className="btn-secondary tables-modal-close"
+                      aria-label="Fermer"
+                      onClick={() => {
+                        setTablePickerItem(null);
+                        setTablePickerOptionIds([]);
+                      }}
+                    >
+                      <X size={18} strokeWidth={2} aria-hidden />
+                    </button>
+                  </div>
+                  <p className="muted tables-picker-unit tabular-nums">Prix unitaire : {formatEur(tablePickerUnitCents)}</p>
+                  <ul className="tables-picker-options">
+                    {tablePickerItem.options.map((opt) => {
+                      const on = tablePickerOptionIds.includes(opt.id);
+                      return (
+                        <li key={opt.id}>
+                          <button
+                            type="button"
+                            className={`tables-picker-opt${on ? " tables-picker-opt--on" : ""}`}
+                            onClick={() =>
+                              setTablePickerOptionIds((prev) =>
+                                prev.includes(opt.id) ? prev.filter((x) => x !== opt.id) : [...prev, opt.id]
+                              )
+                            }
+                          >
+                            <span>{opt.name}</span>
+                            {opt.priceDeltaCents !== 0 ? (
+                              <span className="tabular-nums muted">
+                                {opt.priceDeltaCents > 0 ? "+" : ""}
+                                {formatEur(opt.priceDeltaCents)}
+                              </span>
+                            ) : null}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <div className="tables-picker-footer">
+                    <button type="button" className="btn-secondary" onClick={() => setTablePickerItem(null)}>
+                      Annuler
+                    </button>
+                    <button type="button" className="btn-primary-ios" onClick={() => confirmTablePicker()}>
+                      Ajouter à la table
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -2089,14 +2524,6 @@ function TablesPilot({ token }: { token: string }) {
       ) : null}
     </div>
   );
-}
-
-function statusClass(status: OrderStatus): string {
-  if (status === "PLACED") return "status-placed";
-  if (status === "PREPARING") return "status-preparing";
-  if (status === "READY") return "status-ready";
-  if (status === "SERVED") return "status-served";
-  return "status-cancelled";
 }
 
 async function downloadQr(tableId: string, tableName: string, token: string) {
