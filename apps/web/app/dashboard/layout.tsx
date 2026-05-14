@@ -12,6 +12,7 @@ import {
 import { isLikelyNetworkFailure, readNavigatorOnline } from "@/lib/offline/network";
 import { DashboardNav, type DashboardNavItem } from "@/components/DashboardNav";
 import { DashboardSessionBar } from "@/components/DashboardSessionBar";
+import { QrderLogo } from "@/components/QrderLogo";
 
 type UserRole = "OWNER" | "MANAGER" | "KITCHEN";
 
@@ -188,8 +189,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <header className="dashboard-top-bar">
             <div className="dashboard-top-bar-inner">
               <div className="dashboard-top-brand">
-                <span className="dashboard-top-logo" aria-hidden="true" />
-                <span className="dashboard-top-app">Qrder</span>
+                <QrderLogo className="dashboard-top-lockup" />
                 <span className="dashboard-top-restaurant-badge" title={session.restaurantName}>
                   {session.restaurantName}
                 </span>

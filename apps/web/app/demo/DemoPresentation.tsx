@@ -144,7 +144,7 @@ export default function DemoPresentation() {
       {/* Topbar */}
       <header className="dp-topbar">
         <Link href="/" aria-label="Quitter la démo" className="dp-topbar-home">
-          <QrderLogo className="dp-topbar-logo" />
+          <QrderLogo className="dp-topbar-lockup" />
         </Link>
         <nav className="dp-topbar-center" aria-label="Navigation slides">
           {SLIDES.map((_, i) => (
@@ -276,7 +276,7 @@ function SlideIntro() {
   return (
     <div className="dp-slide dp-slide--center">
       <div className="dp-slide-inner">
-        <QrderLogo className="dp-intro-logo" />
+        <QrderLogo className="dp-intro-lockup" />
         <h1 className="dp-display">
           La commande à table<br />
           <em className="dp-display-em">réinventée.</em>

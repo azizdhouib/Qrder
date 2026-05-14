@@ -92,7 +92,7 @@ export default function LandingMarketing() {
       <header className={`ap-nav${navDense ? " ap-nav--dense" : ""}`}>
         <div className="ap-nav-inner">
           <Link href="/" className="ap-nav-logo" aria-label="Qrder — Accueil">
-            <QrderLogo className="ap-logo-img" />
+            <QrderLogo className="ap-lockup-nav" />
           </Link>
           <nav className="ap-nav-links" aria-label="Navigation principale">
             <a href="#offre">Fonctionnement</a>
@@ -213,7 +213,7 @@ export default function LandingMarketing() {
       {/* ── Footer ── */}
       <footer className="ap-footer">
         <div className="ap-footer-inner">
-          <QrderLogo className="ap-footer-logo" />
+          <QrderLogo className="ap-lockup-footer" />
           <nav className="ap-footer-nav" aria-label="Pied de page">
             <a href="#offre">Fonctionnement</a>
             <a href="#demo">Démo</a>

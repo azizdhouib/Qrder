@@ -1097,7 +1097,7 @@ textarea:focus {
 .dashboard-top-bar-inner {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0.55rem 1rem;
+  padding: 0.68rem 1rem;
   display: flex;
   align-items: center;
   gap: 0.75rem 1.25rem;
@@ -1106,35 +1106,46 @@ textarea:focus {
 .dashboard-top-brand {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.72rem;
   flex-shrink: 0;
   min-width: 0;
 }
 
-.dashboard-top-logo {
-  width: 1.65rem;
-  height: 1.65rem;
-  border-radius: 0.28rem;
-  background: var(--foreground);
+.dashboard-top-lockup {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  line-height: 1;
+  font-size: clamp(1.3rem, 2.9vw, 1.68rem);
 }
 
-.dashboard-top-app {
-  font-size: 1.02rem;
-  font-weight: 700;
-  letter-spacing: -0.035em;
-  color: var(--foreground);
-  white-space: nowrap;
+.dashboard-top-lockup .qrder-lockup-mark {
+  height: 1.36em;
+  max-height: 3.45rem;
+  align-self: center;
+  margin: 0;
+}
+
+.dashboard-top-lockup .qrder-lockup-word {
+  line-height: 1;
+  display: block;
+  align-self: center;
 }
 
 .dashboard-top-restaurant-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--muted-foreground);
-  padding: 0.22rem 0.5rem;
-  border-radius: 0.4rem;
+  line-height: 1.15;
+  padding: 0.38rem 0.62rem;
+  border-radius: 0.45rem;
   background: var(--secondary);
   border: 1px solid var(--border);
   max-width: 9.5rem;
@@ -7669,20 +7680,48 @@ html[data-theme="light"] .landing-nav--dense {
   display: block;
 }
 
-.qrder-logo-svg {
+.qrder-logo-img {
   flex-shrink: 0;
-  /* Pastille + texte : fond sombre (landing / défaut) */
-  --qrder-mark-a: #e4e4e7;
-  --qrder-mark-b: #a1a1aa;
-  --qrder-mark-stroke: rgb(0 0 0 / 0.42);
-  --qrder-word: #ffffff;
+  display: block;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 
-html[data-theme="light"] .qrder-logo-svg {
-  --qrder-mark-a: #52525b;
-  --qrder-mark-b: #18181b;
-  --qrder-mark-stroke: rgb(0 0 0 / 0.12);
-  --qrder-word: #0a0a0a;
+.qrder-logo-img--mark {
+  height: 2.5rem;
+  width: auto;
+  max-height: 48px;
+}
+
+/* Lockup : picto + « qrder » (minuscules, typo dédiée) */
+.qrder-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.44em;
+  white-space: nowrap;
+  font-family: var(--font-qrder-brand), var(--font-inter), system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  line-height: 1;
+  color: inherit;
+}
+
+.qrder-lockup-word {
+  font-size: inherit;
+  text-transform: lowercase;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Picto aligné sur la hauteur visuelle du mot (x-height + ascenders), pas plus petit */
+.qrder-lockup-mark {
+  height: 1.2em;
+  width: auto;
+  max-height: 3.35rem;
+  object-fit: contain;
+  display: block;
+  flex-shrink: 0;
 }
 
 /* --- Landing cinématique (hero type bannière + scroll produit) --- */
@@ -9204,7 +9243,7 @@ html[data-theme="light"] .ap-btn--ghost:hover {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 max(24px, env(safe-area-inset-left));
-  height: 56px;
+  height: 64px;
   display: flex;
   align-items: center;
   gap: 2rem;
@@ -9222,12 +9261,41 @@ html[data-theme="light"] .ap-nav--dense {
 
 .ap-nav-logo {
   flex-shrink: 0;
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  margin-inline: -4px;
+  border-radius: 14px;
   color: var(--ap-fg);
   text-decoration: none;
+  transition: background 0.22s ease, box-shadow 0.22s ease, transform 0.2s ease;
 }
-.ap-logo-img { height: 22px; width: auto; }
+.ap-nav-logo:hover {
+  background: rgb(255 255 255 / 0.08);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+.ap-nav-logo:focus-visible {
+  outline: 2px solid oklch(0.72 0.17 255);
+  outline-offset: 2px;
+}
+html[data-theme="light"] .ap-nav-logo:hover {
+  background: rgb(0 0 0 / 0.05);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.06);
+}
+
+/* Lockup nav landing : picto bien lisible à côté du mot */
+.ap-lockup-nav {
+  font-size: clamp(1.28rem, 3.35vw, 1.58rem);
+}
+.ap-nav--dense .ap-lockup-nav {
+  font-size: clamp(1.18rem, 2.95vw, 1.42rem);
+}
+
+.ap-lockup-footer {
+  font-size: clamp(1rem, 2.35vw, 1.14rem);
+  opacity: 0.88;
+}
 
 .ap-nav-links {
   flex: 1;
@@ -9269,7 +9337,7 @@ html[data-theme="light"] .ap-nav-demo-link {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 130px;
+  padding-top: 138px;
   overflow: hidden;
 }
 
@@ -9634,7 +9702,9 @@ html[data-theme="light"] .ap-value-card:hover { background: #f5f5f7; }
   flex-wrap: wrap;
 }
 
-.ap-footer-logo { height: 18px; width: auto; opacity: 0.65; }
+.ap-lockup-footer .qrder-lockup-mark {
+  max-height: 2.65rem;
+}
 
 .ap-footer-nav {
   display: flex;
@@ -10152,7 +10222,13 @@ body:has(.dp-root) .theme-toggle { display: none !important; }
 }
 
 .dp-topbar-home { display: flex; align-items: center; flex-shrink: 0; text-decoration: none; }
-.dp-topbar-logo { height: 18px; width: auto; opacity: 0.72; }
+.dp-topbar-lockup {
+  font-size: clamp(0.78rem, 1.6vw, 0.9rem);
+  opacity: 0.88;
+}
+.dp-topbar-lockup .qrder-lockup-mark {
+  max-height: 1.65rem;
+}
 
 .dp-topbar-center {
   flex: 1;
@@ -10376,7 +10452,13 @@ body:has(.dp-root) .theme-toggle { display: none !important; }
 }
 
 /* ── Intro logo ── */
-.dp-intro-logo { height: 32px; width: auto; opacity: 0.85; }
+.dp-intro-lockup {
+  font-size: clamp(1.35rem, 3.5vw, 1.75rem);
+  opacity: 0.9;
+}
+.dp-intro-lockup .qrder-lockup-mark {
+  max-height: 3rem;
+}
 
 /* ── Problem cards ── */
 .dp-card-row {
@@ -10802,3 +10884,79 @@ body:has(.dp-root) .theme-toggle { display: none !important; }
 }
 .dp-hint--gone { opacity: 0; }
 @media (max-width: 560px) { .dp-hint { display: none; } }
+
+/* ── PWA : installation + mode standalone (tablette / KDS) ── */
+.pwa-install-bar {
+  position: fixed;
+  z-index: 9998;
+  bottom: max(4.75rem, calc(3.25rem + env(safe-area-inset-bottom, 0px)));
+  left: max(1rem, env(safe-area-inset-left, 0px));
+  right: auto;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+  max-width: min(20rem, calc(100vw - 2rem));
+  border-radius: 0.85rem;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  background: var(--glass-bg);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  box-shadow: var(--shadow-a);
+  animation: connection-pill-in 420ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.pwa-install-bar--stack {
+  flex-direction: column;
+}
+
+.pwa-install-hint {
+  margin: 0;
+  padding: 0.45rem 0.75rem 0.6rem;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+  border-top: 1px solid var(--hairline);
+  outline: none;
+}
+
+.pwa-install-hint--success {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.pwa-install-bar-main {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.85rem;
+  min-height: 2.5rem !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--foreground) !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
+.pwa-install-bar-main:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--secondary), transparent 55%) !important;
+  transform: none !important;
+}
+
+html.pwa-standalone body {
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  overscroll-behavior-y: none;
+}
+
+@media (display-mode: standalone) {
+  html body {
+    touch-action: manipulation;
+  }
+}
